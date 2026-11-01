@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
 import { fullAddress, maps, site } from '@/data/site';
 import { products } from '@/data/products';
 import { services } from '@/data/services';
@@ -41,7 +41,7 @@ const columns = [
 export default function Footer() {
   return (
     <footer className="border-t border-line bg-elevated">
-      <div className="container-x grid gap-12 py-16 lg:grid-cols-[1.1fr_3fr]">
+      <div className="container-x grid gap-x-12 gap-y-10 py-14 lg:grid-cols-[1.1fr_3fr]">
         <div>
           <Logo />
           <p className="mt-4 font-display text-lg font-semibold">{site.slogan}</p>
@@ -71,7 +71,7 @@ export default function Footer() {
             </a>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-3 xl:grid-cols-5">
           {columns.map((col) => (
             <div key={col.title}>
               <h3 className="font-sans text-sm font-semibold tracking-normal">{col.title}</h3>
@@ -86,6 +86,19 @@ export default function Footer() {
               </ul>
             </div>
           ))}
+          {/* Fills the empty grid cell left by the 5th column group on 2–3 column layouts. */}
+          <div className="flex flex-col justify-center rounded-2xl border border-brand/30 bg-brand-soft p-5 xl:col-span-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="font-display text-lg font-bold">Ready to scale your business?</p>
+              <p className="mt-1 text-sm text-fg-muted">Book a free demo — we respond within 12 hours, worldwide.</p>
+            </div>
+            <Link
+              href="/contact?intent=demo"
+              className="mt-4 inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-on-cta transition hover:bg-cta-hover xl:mt-0 xl:self-auto"
+            >
+              Book a free demo <ArrowRight className="size-4" />
+            </Link>
+          </div>
         </div>
       </div>
       <div className="border-t border-line">
