@@ -56,6 +56,7 @@ export default function MtkBot() {
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [teaser, setTeaser] = useState(false);
+  const [teaserClosed, setTeaserClosed] = useState(false);
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState('');
   const [msgs, setMsgs] = useState<Msg[]>([{ from: 'bot', reply: welcome }]);
@@ -69,6 +70,7 @@ export default function MtkBot() {
     try {
       const saved = sessionStorage.getItem(STORE);
       if (saved) setMsgs(JSON.parse(saved));
+      if (localStorage.getItem('mtk-bot-teaser-closed') === '1') setTeaserClosed(true);
     } catch {}
     // Any link to #mtk-bot opens the chat.
     const fromHash = () => location.hash === '#mtk-bot' && setOpen(true);
@@ -123,6 +125,14 @@ export default function MtkBot() {
     setMsgs([{ from: 'bot', reply: welcome }]);
   };
 
+  const closeTeaser = () => {
+    setTeaser(false);
+    setTeaserClosed(true);
+    try {
+      localStorage.setItem('mtk-bot-teaser-closed', '1');
+    } catch {}
+  };
+
   // Chips follow the latest bot answer; Menu is always reachable.
   const lastBot = [...msgs].reverse().find((m) => m.from === 'bot');
   const suggestions = (lastBot?.reply.suggestions ?? MENU).filter((x) => x !== 'Menu');
@@ -131,15 +141,25 @@ export default function MtkBot() {
     <>
       {/* Launcher */}
       <div className="fixed bottom-[88px] right-4 z-[65] flex items-end gap-2 sm:right-5">
-        {teaser && !open && (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="word-in mb-6 hidden max-w-[210px] rounded-2xl rounded-br-sm border border-line bg-elevated px-4 py-2.5 text-left text-sm shadow-float sm:block"
-          >
-            <span className="font-semibold">Hi! I&apos;m MTK Bot 👋</span>
-            <span className="block text-xs text-fg-muted">Questions about our products? Ask me!</span>
-          </button>
+        {teaser && !open && !teaserClosed && (
+          <div className="word-in relative mb-6 hidden sm:block">
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="block max-w-[210px] rounded-2xl rounded-br-sm border border-line bg-elevated px-4 py-2.5 text-left text-sm shadow-float"
+            >
+              <span className="font-semibold">Hi! I&apos;m MTK Bot 👋</span>
+              <span className="block text-xs text-fg-muted">Questions about our products? Ask me!</span>
+            </button>
+            <button
+              type="button"
+              onClick={closeTeaser}
+              aria-label="Dismiss MTK Bot teaser"
+              className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full border border-line bg-elevated text-fg-muted shadow-float transition hover:text-brand"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
         )}
         <button
           type="button"
