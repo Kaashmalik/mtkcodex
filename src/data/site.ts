@@ -36,6 +36,7 @@ export const site = {
     { name: 'United States & Canada', code: 'US', note: 'Evening overlap' },
   ],
   founder: {
+    image: '/images/founder.jpg',
     name: 'Muhammad Kashif',
     role: 'CEO & Founder · Full-Stack SaaS Architect',
     bio: 'Muhammad Kashif founded MTK Codex to give growing businesses the kind of engineering usually reserved for enterprises. He has designed and shipped seven production platforms across FinTech, AgriTech, EdTech, SportsTech, e-commerce, AI security and desktop software — owning every layer from database schema and APIs to UI, payments, automation and deployment.',

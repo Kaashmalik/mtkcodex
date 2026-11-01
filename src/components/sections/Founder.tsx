@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Award, Mail } from 'lucide-react';
 import { site } from '@/data/site';
 import { Button } from '@/components/ui/primitives';
@@ -9,11 +10,15 @@ export default function Founder() {
   return (
     <section id="founder" className="container-x scroll-mt-24 py-20">
       <Reveal className="card grid overflow-hidden lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="relative isolate flex min-h-[340px] flex-col justify-end overflow-hidden bg-[linear-gradient(160deg,#032d42,#075058_55%,#1f7a3a)] p-8 text-white sm:p-10">
-          <div className="absolute inset-0 -z-10 opacity-30 [background-image:radial-gradient(circle_at_30%_20%,white_0,transparent_40%)]" />
-          <div className="mb-auto grid size-28 place-items-center rounded-3xl border border-white/30 bg-white/10 font-display text-4xl font-extrabold backdrop-blur">
-            MK
-          </div>
+        <div className="relative isolate flex min-h-[420px] flex-col justify-end overflow-hidden bg-[linear-gradient(160deg,#032d42,#075058_55%,#1f7a3a)] p-8 text-white sm:p-10">
+          <Image
+            src={f.image}
+            alt={`${f.name} — ${f.role}`}
+            fill
+            sizes="(min-width: 1024px) 40vw, 100vw"
+            className="absolute inset-0 -z-20 size-full object-cover object-top"
+          />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#021d2b]/90 via-[#032d42]/40 to-transparent" />
           <p className="mt-10 text-sm uppercase tracking-[0.18em] text-white/70">Leadership</p>
           <h2 className="mt-2 text-3xl font-bold sm:text-4xl">{f.name}</h2>
           <p className="mt-1 text-white/80">{f.role}</p>

@@ -139,6 +139,7 @@ const orgJsonLd = {
       '@id': FOUNDER_ID,
       name: site.founder.name,
       jobTitle: 'CEO & Founder',
+      image: `${site.url}${site.founder.image}`,
       worksFor: { '@id': ORG_ID },
       url: site.social.portfolio,
       sameAs: [site.social.github, site.social.linkedin, site.social.portfolio],
