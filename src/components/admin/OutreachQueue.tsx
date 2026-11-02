@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  ExternalLink,
   MessageSquareOff,
   Send,
   ShieldAlert,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { STATUS_LABELS, applyLocalOverrides, waLink, writeLocalOverride, type Lead, type LeadOverride } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
+import { LEADS_SHEET_URL } from '@/lib/crm-links';
 import type { StorageMode } from '@/lib/leads';
 
 type Tab = 'queue' | 'sent' | 'skipped';
@@ -130,6 +132,14 @@ export default function OutreachQueue({
         <div className="text-right">
           <p className="text-3xl font-bold">{progress}%</p>
           <p className="text-xs text-fg-subtle">batch complete</p>
+          <a
+            href={LEADS_SHEET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-fg-subtle transition hover:text-brand"
+          >
+            <ExternalLink className="size-3" /> Warehouse sheet
+          </a>
         </div>
       </div>
 

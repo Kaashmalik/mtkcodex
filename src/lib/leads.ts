@@ -112,14 +112,15 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
   return leads[index];
 }
 
-/** Copies the bundled seed batch into Supabase (idempotent). */
+/** Copies the bundled seed batch into Supabase, adding only leads that are missing. */
 export async function importSeedLeads(): Promise<number> {
   if (storageMode() !== 'supabase') {
     throw new Error('Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY first.');
   }
   const rows = await supabase<Lead[]>('leads?on_conflict=id&select=id', {
     method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    // Never overwrite live CRM state (status, notes, dates) for a lead that exists.
+    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
     body: JSON.stringify(seedLeads),
   });
   return rows.length;

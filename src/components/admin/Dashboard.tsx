@@ -31,6 +31,7 @@ import {
   type LeadStatus,
 } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
+import { LEADS_SHEET_URL } from '@/lib/crm-links';
 import type { StorageMode } from '@/lib/leads';
 
 type Draft = Pick<Lead, 'status' | 'notes' | 'next_followup' | 'do_not_contact' | 'message'>;
@@ -215,7 +216,7 @@ export default function Dashboard({
       const reload = await fetch('/api/admin/leads', { cache: 'no-store' });
       const fresh = (await reload.json()) as { leads?: Lead[] };
       if (fresh.leads) setLeads(fresh.leads);
-      setToast(`Imported ${data.count ?? 0} leads`);
+      setToast(data.count ? `Added ${data.count} new leads` : 'All seed leads are already in the CRM');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {
@@ -233,8 +234,7 @@ export default function Dashboard({
           <h1 className="mt-2 text-3xl font-bold">Pipeline</h1>
           <p className="mt-1 text-sm text-fg-muted">
             Signed in as {email}. {stats.total} leads in this workspace.
-          </p>
-        </div>
+          </p>        </div>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href="/admin/outreach"
@@ -263,11 +263,20 @@ export default function Dashboard({
               type="button"
               onClick={importSeed}
               disabled={importing}
+              title="Adds leads from the bundled seed batch that are not already in the CRM. Existing leads are left untouched."
               className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
             >
               <RefreshCw className={`size-4 ${importing ? 'animate-spin' : ''}`} /> Import batch
             </button>
           )}
+          <a
+            href={LEADS_SHEET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand"
+          >
+            <ExternalLink className="size-4" /> Google Sheet
+          </a>
         </div>
       </div>
 

@@ -95,6 +95,34 @@ Notes for future work:
 - Rotate the secret key in Supabase → Project Settings → API keys, then update the Vercel env var
   and redeploy. Revoke any personal access token used for one-off setup once it is no longer needed.
 
+### Google Sheet (warehouse mirror)
+
+The scraper project (`C:\Users\DELL\leads\lahore_leads`) owns a Google Sheet warehouse; the CRM is
+the working pipeline. Both admin pages link to it with the **Google Sheet** / **Warehouse sheet** button.
+
+| Item | Value |
+|---|---|
+| Spreadsheet | [`1DFO45PtJIEDnGX-xyCbzp1FTGXDVVok3Klu74ANIdJM`](https://docs.google.com/spreadsheets/d/1DFO45PtJIEDnGX-xyCbzp1FTGXDVVok3Klu74ANIdJM/edit#gid=312869384) |
+| Tab | `Leads` (~6,200 rows, full enrichment columns) |
+| Credentials | Service account JSON in the scraper repo (`credentials/`), shared with the sheet — never committed here |
+| Upstream sync | `scripts/sync_outreach_state.py --apply` in the scraper repo mirrors sends into `status`, `last_contacted`, `next_followup`, `notes` |
+
+After a sending session, bring the day's sends into the CRM:
+
+```bash
+# Dry run: shows what would change
+node scripts/import-sent-log.mjs "C:\Users\DELL\leads\lahore_leads\output\sent_2026-11-02.csv"
+
+# Write to Supabase
+node scripts/import-sent-log.mjs "C:\Users\DELL\leads\lahore_leads\output\sent_2026-11-02.csv" --apply
+```
+
+The importer reads `.env.local`, matches by `lead_id` then phone number, marks leads `contacted`,
+stamps `last_contacted`, sets `next_followup` three days out, appends
+`WhatsApp sent YYYY-MM-DD (1 touch)` and creates any missing lead with a generated opener.
+It is idempotent, so re-running the same file is safe. Options: `--date=YYYY-MM-DD`,
+`--followup-days=N`.
+
 ---
 
 ## 4. Data model
@@ -160,7 +188,8 @@ number banned — this app intentionally stays click-to-send.
 2. Copy the selected rows into `src/data/leads.seed.json` (see the existing structure), one
    object per lead with generated `message`, `status: "queued"`, timestamps.
 3. Commit the seed file. On a fresh environment the dashboard shows it automatically.
-4. With Supabase connected: `/admin` → **Import batch** (upsert by `id`, safe to repeat).
+4. With Supabase connected: `/admin` → **Import batch** (adds seed leads that are not already in the
+   CRM; existing rows keep their live status, notes and dates).
 5. Record the batch in `docs/outreach/YYYY-MM-DD-<area>.md`.
 
 Tip: keep the seed file to the current batch (10–25 rows). The full scraped database stays in
@@ -189,6 +218,8 @@ Tip: keep the seed file to the current batch (10–25 rows). The full scraped da
 | `src/lib/leads.ts` | Storage adapter (Supabase / file / read-only) |
 | `src/lib/lead-types.ts` | Shared types, stats, CSV, WhatsApp links |
 | `src/components/admin/` | Dashboard, outreach queue, login form |
+| `src/lib/crm-links.ts` | Google Sheet warehouse link used by both admin pages |
+| `scripts/import-sent-log.mjs` | Reconciles a WhatsApp sent CSV into the CRM (idempotent) |
 | `src/data/leads.seed.json` | Current outreach batch (committed) |
 | `supabase/migrations/0001_leads.sql` | Table, indexes, trigger, RLS |
 

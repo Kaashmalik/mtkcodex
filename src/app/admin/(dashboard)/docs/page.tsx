@@ -59,6 +59,10 @@ export default function AdminDocsPage() {
             status/notes edits are kept in this browser only — use <em>Export CSV</em> to keep a copy.
           </li>
           <li>Use <em>Export CSV</em> for backups or to sync back into the scraping pipeline.</li>
+          <li>
+            The scraper keeps a Google Sheet warehouse (linked from this page). After sending, reconcile the
+            sent log into the CRM with <code className="rounded bg-muted px-1">scripts/import-sent-log.mjs</code>.
+          </li>
         </ul>
       </Section>
 
@@ -99,8 +103,9 @@ export default function AdminDocsPage() {
       </Section>
 
       <div className="mt-8 rounded-xl border border-line bg-muted/40 p-4 text-xs leading-relaxed text-fg-muted">
-        Batch records are committed under <code>docs/outreach/</code>. The current batch is{' '}
-        <code>docs/outreach/2026-11-02-dha-gulberg.md</code>. Supabase migration:{' '}
+        Batch records are committed under <code>docs/outreach/</code> — the 15-lead batch in{' '}
+        <code>docs/outreach/2026-11-02-dha-gulberg.md</code> and the 14 sends in{' '}
+        <code>docs/outreach/2026-11-02-sent-log.md</code>. Supabase migration:{' '}
         <code>supabase/migrations/0001_leads.sql</code>.
       </div>
     </div>
