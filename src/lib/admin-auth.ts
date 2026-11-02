@@ -11,11 +11,12 @@ export function adminEmail(): string {
 }
 
 function adminPassword(): string {
-  return process.env.ADMIN_PASSWORD || '';
+  // Env values pasted through dashboards/CLIs often carry a trailing newline.
+  return (process.env.ADMIN_PASSWORD || '').trim();
 }
 
 function sessionSecret(): string {
-  return process.env.ADMIN_SESSION_SECRET || '';
+  return (process.env.ADMIN_SESSION_SECRET || '').trim();
 }
 
 export function adminConfigured(): boolean {

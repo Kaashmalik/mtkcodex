@@ -8,7 +8,7 @@ export { LEAD_STATUSES, STATUS_LABELS, leadStats, waLink, leadsToCsv } from '@/l
 
 export type StorageMode = 'supabase' | 'file' | 'readonly';
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
 const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const FILE_PATH = path.join(process.cwd(), '.data', 'leads.json');
 
