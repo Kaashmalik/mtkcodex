@@ -135,7 +135,7 @@ const intents: Intent[] = [
   { keywords: ['price', 'pricing', 'cost', 'kitna', 'kitne', 'qeemat', 'rate', 'budget', 'charges', 'fee', 'how much', 'quote', 'estimate', 'paise'], reply: pricingReply },
   {
     keywords: ['demo', 'meeting', 'appointment', 'schedule', 'consultation', 'book a demo'],
-    reply: { text: 'Great! A free demo or consultation is 30 minutes with the engineer who builds your product. Pick a time that suits you:', links: [{ label: 'Book a demo', href: '/contact?intent=demo' }, { label: 'WhatsApp us', href: whatsappLink('Hi, I would like to book a demo.') }], suggestions: ['Products', 'Services', 'Menu'] },
+    reply: { text: 'Great! A free demo or consultation is 30 minutes with the engineer who builds your product. Pick a time that suits you:', links: [{ label: 'Book a demo', href: '/contact?intent=demo' }, { label: 'WhatsApp us', href: whatsappLink('Hello MTK Codex, I would like to book a demo. Could you share your available time slots?') }], suggestions: ['Products', 'Services', 'Menu'] },
   },
   ...products.map((x) => ({ keywords: [x.name.toLowerCase(), ...(productWords[x.slug] ?? [])], reply: productReply(x) })),
   ...services.map((s) => ({ keywords: [s.title.toLowerCase(), ...(serviceWords[s.id] ?? [])], reply: serviceReply(s) })),

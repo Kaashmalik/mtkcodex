@@ -65,14 +65,22 @@ npm run dev                  # → http://localhost:3000
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
 | `npm run lint` | Lint with ESLint |
+| `npm run outreach:doc` | Render `src/data/leads.seed.json` into a dated batch record under `docs/outreach/` |
 
 ### Environment Variables
 
 ```bash
 RESEND_API_KEY=re_xxxxxxxx   # free at resend.com — enables direct email delivery
+
+ADMIN_EMAIL=kaash0542@gmail.com   # CRM login
+ADMIN_PASSWORD=                  # strong password (required for /admin)
+ADMIN_SESSION_SECRET=            # 32+ random bytes for signed sessions
+
+SUPABASE_URL=                    # optional: persist leads on Vercel
+SUPABASE_SERVICE_ROLE_KEY=       # server-only key, never exposed to the browser
 ```
 
-Without `RESEND_API_KEY` the contact form gracefully opens the visitor's email client instead. See [`.env.example`](./.env.example).
+Without `RESEND_API_KEY` the contact form gracefully opens the visitor's email client instead. Without Supabase the admin CRM runs on a local file in development and read-only on Vercel. See [`.env.example`](./.env.example) and [`docs/CRM.md`](./docs/CRM.md).
 
 ## 🗺️ Pages
 
@@ -88,31 +96,53 @@ Without `RESEND_API_KEY` the contact form gracefully opens the visitor's email c
 | `/contact` | Lead form (pre-filled from `?intent=`, `?service=`, `?product=`), WhatsApp, email |
 | `/blog/[slug]` | Markdown blog rendered with `marked` from `content/blog/` |
 | `/locations` | Location pages incl. Lahore, with keyless maps embeds |
+| `/admin` | Lead CRM: pipeline, filters, notes, follow-ups, CSV export (owner-only) |
+| `/admin/outreach` | WhatsApp send queue with pre-written, personalised openers |
+| `/admin/docs` | In-app playbook; full version in [`docs/CRM.md`](./docs/CRM.md) |
 
 ## 📁 Project Structure
 
 ```
 mtkcodex/
 ├── content/blog/           # Markdown blog posts
+├── docs/                   # CRM runbook + outreach batch records
 ├── public/                 # Static assets (icons, favicon)
+├── supabase/migrations/    # Lead CRM table + RLS migration
+├── scripts/                # Batch doc generator
 ├── src/
 │   ├── app/                # App Router pages, API routes, SEO files
+│   │   ├── (site)/         # Public marketing pages (navbar/footer chrome)
+│   │   ├── admin/          # Owner-only CRM dashboard + outreach desk
 │   │   ├── api/contact/    # Resend-powered contact endpoint
+│   │   ├── api/admin/      # Session-guarded CRM API
 │   │   ├── blog/[slug]/    # Blog + dynamic OG images
 │   │   └── products/[slug]/
-│   ├── components/         # layout · sections · motion · ui · demo
+│   ├── components/         # layout · sections · motion · ui · demo · admin
 │   ├── data/               # 👈 All site copy lives here
 │   │   ├── site.ts         # Brand, contact, founder, stats
 │   │   ├── products.ts     # The 7 products (add here → appears everywhere)
 │   │   ├── services.ts     # Services + delivery process
+│   │   ├── leads.seed.json # Current outreach batch (imported by the CRM)
 │   │   └── content.ts      # Testimonials, industries, pricing, FAQ
-│   └── lib/                # blog, seo, consent, OG icon helpers
+│   └── lib/                # blog, seo, auth, lead storage, consent, OG helpers
 ├── .env.example
 ├── LICENSE                 # MIT
 └── package.json
 ```
 
 > **Adding content:** drop a new product into `src/data/products.ts` or a new `.md` file into `content/blog/` — routing, sitemap and OG images pick it up automatically.
+
+## 🎯 Lead CRM & Outreach
+
+The site includes a private CRM for the Lahore outreach pipeline — no third-party CRM needed.
+
+1. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET`.
+2. (Production) run [`supabase/migrations/0001_leads.sql`](./supabase/migrations/0001_leads.sql) and add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
+3. Sign in at `/admin`, import the bundled batch once, then work the queue at `/admin/outreach`.
+
+Each lead stores its score, source area, pre-written opener, status, notes, last contact and next follow-up. The outreach desk opens `wa.me` with the message pre-filled — sending stays manual, one at a time, which keeps the business number safe.
+
+Full runbook: [`docs/CRM.md`](./docs/CRM.md) · Batch records: [`docs/outreach/`](./docs/outreach/)
 
 ## ☁️ Deploy
 

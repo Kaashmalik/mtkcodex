@@ -2,16 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Sora } from 'next/font/google';
 import './globals.css';
 import { fullAddress, maps, site } from '@/data/site';
-import AnnouncementBar from '@/components/layout/AnnouncementBar';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import FloatingContact from '@/components/layout/FloatingContact';
-import { ScrollProgress, SpotlightProvider } from '@/components/motion/Effects';
 import { services } from '@/data/services';
 import { FOUNDER_ID, ORG_ID } from '@/lib/seo';
-import CookieConsent from '@/components/layout/CookieConsent';
-import MtkBot from '@/components/bot/MtkBot';
-import ThirdPartyScripts, { ADSENSE_CLIENT, ConsentDefaults } from '@/components/layout/ThirdPartyScripts';
+import { ADSENSE_CLIENT, ConsentDefaults } from '@/components/layout/ThirdPartyScripts';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const sora = Sora({ subsets: ['latin'], variable: '--font-sora', display: 'swap' });
@@ -164,24 +157,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ConsentDefaults />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd).replace(/</g, '\\u003c') }} />
       </head>
-      <body>
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-cta focus:px-4 focus:py-2 focus:text-on-cta"
-        >
-          Skip to content
-        </a>
-        <ScrollProgress />
-        <SpotlightProvider />
-        <AnnouncementBar />
-        <Navbar />
-        <main id="main">{children}</main>
-        <Footer />
-        <FloatingContact />
-        <MtkBot />
-        <CookieConsent />
-        <ThirdPartyScripts />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

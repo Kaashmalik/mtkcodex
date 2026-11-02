@@ -8,7 +8,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "outreach:doc": "node scripts/outreach-doc.mjs"
   },
   "dependencies": {
     "lucide-react": "1.66.0",

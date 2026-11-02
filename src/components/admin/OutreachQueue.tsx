@@ -1,0 +1,287 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Copy,
+  MessageSquareOff,
+  Send,
+  ShieldAlert,
+  X,
+} from 'lucide-react';
+import { STATUS_LABELS, waLink, type Lead } from '@/lib/lead-types';
+import { WhatsappIcon } from '@/components/ui/BrandIcons';
+import type { StorageMode } from '@/lib/leads';
+
+type Tab = 'queue' | 'sent' | 'skipped';
+
+export default function OutreachQueue({
+  initialLeads,
+  mode,
+}: {
+  initialLeads: Lead[];
+  mode: StorageMode;
+}) {
+  const [leads, setLeads] = useState(initialLeads);
+  const [tab, setTab] = useState<Tab>('queue');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(''), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const queued = useMemo(
+    () =>
+      leads
+        .filter((lead) => lead.status === 'queued' && !lead.do_not_contact)
+        .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0) || a.name.localeCompare(b.name)),
+    [leads],
+  );
+  const sent = useMemo(
+    () =>
+      leads
+        .filter((lead) => ['contacted', 'replied', 'interested', 'won', 'lost'].includes(lead.status))
+        .sort((a, b) => (b.last_contacted || '').localeCompare(a.last_contacted || '')),
+    [leads],
+  );
+  const skipped = useMemo(() => leads.filter((lead) => lead.status === 'skipped'), [leads]);
+
+  const list = tab === 'queue' ? queued : tab === 'sent' ? sent : skipped;
+
+  async function patch(
+    lead: Lead,
+    patchBody: Record<string, unknown>,
+    successMessage: string,
+    note?: string,
+  ) {
+    if (mode === 'readonly') {
+      setError('Read-only mode — connect Supabase to record outreach.');
+      return;
+    }
+    setBusyId(lead.id);
+    setError('');
+    try {
+      const payload = note ? { ...patchBody, notes: [lead.notes, note].filter(Boolean).join('\n') } : patchBody;
+      const res = await fetch('/api/admin/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: lead.id, ...payload }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { lead?: Lead; error?: string };
+      if (!res.ok || !data.lead) throw new Error(data.error || 'Could not update lead');
+      setLeads((current) => current.map((row) => (row.id === lead.id ? data.lead! : row)));
+      setToast(successMessage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update lead');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function copy(lead: Lead) {
+    try {
+      await navigator.clipboard.writeText(lead.message);
+      setToast('Message copied — paste in WhatsApp');
+    } catch {
+      setError('Copy failed. Select the message text manually.');
+    }
+  }
+
+  const counts = {
+    queue: queued.length,
+    sent: sent.length,
+    skipped: skipped.length,
+  };
+  const total = leads.length;
+  const done = sent.length + skipped.length;
+  const progress = total ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow">Outreach</p>
+          <h1 className="mt-2 text-3xl font-bold">Send queue</h1>
+          <p className="mt-1 text-sm text-fg-muted">
+            {total} leads in this batch · {queued.length} waiting · {done} handled
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-3xl font-bold">{progress}%</p>
+          <p className="text-xs text-fg-subtle">batch complete</p>
+        </div>
+      </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-cta transition-all" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+        <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+        <span>
+          Send <strong>one at a time</strong>, from your own WhatsApp. Open chat → copy message → paste → send →
+          mark sent. Keep it under ~15–20 new conversations a day to protect your number, and honour every STOP
+          request immediately.
+        </span>
+      </div>
+
+      {mode === 'readonly' && (
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>Read-only mode. Outreach can be copied, but status changes need Supabase configured.</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="ml-auto" aria-label="Dismiss">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="mt-6 flex flex-wrap gap-2">
+        {(
+          [
+            ['queue', `Queue (${counts.queue})`],
+            ['sent', `Sent (${counts.sent})`],
+            ['skipped', `Not on WhatsApp (${counts.skipped})`],
+          ] as [Tab, string][]
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={`h-9 rounded-full border px-4 text-sm font-semibold transition ${
+              tab === value
+                ? 'border-brand bg-brand-soft text-brand'
+                : 'border-line text-fg-muted hover:border-brand/50 hover:text-brand'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {list.map((lead, index) => (
+          <article key={lead.id} className="card p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-fg-muted">
+                    {tab === 'queue' ? index + 1 : '✓'}
+                  </span>
+                  <h2 className="truncate font-bold">{lead.name}</h2>
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase text-fg-subtle">
+                    {lead.lead_tier} · {lead.lead_score}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-fg-subtle">
+                  {lead.business_type} · {lead.area} · <span className="font-mono">{lead.phone}</span>
+                </p>
+              </div>
+              <span
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                  lead.status === 'skipped'
+                    ? 'border-line bg-muted text-fg-muted'
+                    : lead.status === 'queued'
+                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {STATUS_LABELS[lead.status]}
+              </span>
+            </div>
+
+            <p className="mt-3 whitespace-pre-wrap rounded-xl border border-line bg-muted/40 px-3 py-2.5 text-[13px] leading-relaxed text-fg-muted">
+              {lead.message || 'No message drafted yet — add one from the Leads page.'}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <a
+                href={waLink(lead)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#25d366] px-4 text-sm font-semibold text-white transition hover:brightness-105"
+              >
+                <WhatsappIcon className="size-4" /> Open chat
+              </a>
+              <button
+                type="button"
+                onClick={() => copy(lead)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand"
+              >
+                <Copy className="size-3.5" /> Copy message
+              </button>
+              {tab === 'queue' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => patch(lead, { status: 'contacted' }, 'Marked as sent')}
+                    disabled={busyId === lead.id || mode === 'readonly'}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
+                  >
+                    <CheckCircle2 className="size-3.5" /> Mark sent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch(
+                        lead,
+                        { status: 'skipped' },
+                        'Marked as not on WhatsApp',
+                        `Not on WhatsApp (checked ${new Date().toISOString().slice(0, 10)}).`,
+                      )
+                    }
+                    disabled={busyId === lead.id || mode === 'readonly'}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-red-400 hover:text-red-500 disabled:opacity-50"
+                  >
+                    <MessageSquareOff className="size-3.5" /> Not on WhatsApp
+                  </button>
+                </>
+              )}
+              {tab !== 'queue' && (
+                <button
+                  type="button"
+                  onClick={() => patch(lead, { status: 'queued' }, 'Moved back to queue')}
+                  disabled={busyId === lead.id || mode === 'readonly'}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
+                >
+                  <Send className="size-3.5" /> Requeue
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+
+        {list.length === 0 && (
+          <div className="card grid place-items-center gap-2 p-10 text-center">
+            <CheckCircle2 className="size-8 text-emerald-500" />
+            <p className="font-semibold">
+              {tab === 'queue' ? 'Queue is clear' : tab === 'sent' ? 'Nothing sent yet' : 'Nothing marked unavailable'}
+            </p>
+            <p className="text-sm text-fg-muted">
+              {tab === 'queue'
+                ? 'All leads in this batch are handled. Import the next batch when you are ready.'
+                : 'Statuses you set here are saved to the CRM.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg shadow-float">
+          <Check className="size-4" /> {toast}
+        </div>
+      )}
+    </div>
+  );
+}

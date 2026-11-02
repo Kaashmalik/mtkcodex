@@ -81,7 +81,7 @@ export default function LoginPage() {
                   {site.email}
                 </a>{' '}
                 or{' '}
-                <a className="font-medium text-brand" href={whatsappLink('Hi, I need help signing in to my MTK Codex product.')} target="_blank" rel="noopener noreferrer">
+                <a className="font-medium text-brand" href={whatsappLink('Hello MTK Codex, I need help signing in to my product account.')} target="_blank" rel="noopener noreferrer">
                   message us on WhatsApp
                 </a>
                 .

@@ -81,5 +81,5 @@ export const maps = {
 
 export const fullAddress = [site.address.street, site.address.city, site.address.region, site.address.postalCode, site.address.country].filter(Boolean).join(', ');
 
-export const whatsappLink =(text = 'Hi MTK Codex, I would like to discuss a project.') =>
+export const whatsappLink =(text = "Hello MTK Codex, I'd like to discuss a project. Please let me know the best time for a quick call.") =>
   `https://wa.me/${site.whatsapp}?text=${encodeURIComponent(text)}`;
