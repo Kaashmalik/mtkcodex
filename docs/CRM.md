@@ -74,6 +74,27 @@ The dashboard shows a banner explaining which mode is active.
 
 RLS is enabled with no policies, so the anon/public key cannot read the table.
 
+### Current production setup
+
+| Item | Value |
+|---|---|
+| Supabase project | `ldfqabpupduhzdycogdn` (`https://ldfqabpupduhzdycogdn.supabase.co`) |
+| App key | Project **secret** key (`sb_secret_…`), set in Vercel for production, preview and development |
+| Table | `public.leads` (migration `0001_leads.sql` applied) |
+| Seeded | 15 leads from the 2026-11-02 batch (13 queued, 2 contacted) |
+
+Notes for future work:
+
+- Use the project **secret** key (or a legacy `service_role` JWT) as `SUPABASE_SERVICE_ROLE_KEY`.
+  The publishable/`anon` key is for browsers and is blocked by RLS; a Supabase **personal access
+  token** (`sbp_…`) only works against the Management API and is not a database key.
+- Supabase's newer `sb_secret_…` keys are not JWTs, so send them in both `apikey` and
+  `Authorization: Bearer` headers (the storage adapter already does this).
+- Values added through the Vercel CLI or dashboard can arrive with a trailing space/newline.
+  `src/lib/leads.ts` and `src/lib/admin-auth.ts` trim them; keep that behaviour when editing.
+- Rotate the secret key in Supabase → Project Settings → API keys, then update the Vercel env var
+  and redeploy. Revoke any personal access token used for one-off setup once it is no longer needed.
+
 ---
 
 ## 4. Data model
