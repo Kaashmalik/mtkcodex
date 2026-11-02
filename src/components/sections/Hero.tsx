@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { CheckCircle2, PlayCircle } from 'lucide-react';
 import { site } from '@/data/site';
 import { Button } from '@/components/ui/primitives';
@@ -12,13 +13,13 @@ export default function Hero() {
 
       <div className="container-x grid items-center gap-14 pb-20 pt-14 lg:grid-cols-[1.05fr_1fr] lg:pb-24 lg:pt-20">
         <div>
-          <a
+          <Link
             href="/products"
             className="inline-flex items-center gap-2 rounded-full border border-line bg-elevated/70 py-1 pl-1 pr-3 text-xs font-medium text-fg-muted backdrop-blur transition hover:border-accent"
           >
             <span className="rounded-full bg-cta px-2 py-0.5 font-semibold text-on-cta">New</span>
             7 SaaS platforms, ready to launch under your brand →
-          </a>
+          </Link>
           <h1 className="mt-6 text-[2.6rem] font-extrabold leading-[1.04] sm:text-6xl lg:text-[4.2rem]">
             Code that scales
             <br />

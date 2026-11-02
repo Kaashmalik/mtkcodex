@@ -1,18 +1,17 @@
-import { getAdminSession } from '@/lib/admin-auth';
-import { leadsToCsv, listLeads } from '@/lib/leads';
+import { requireAdmin } from '@/lib/admin-auth';
+import { leadsToCsv, listLeads, todayPKT } from '@/lib/leads';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const session = await getAdminSession();
-  if (!session) return new Response('Unauthorized', { status: 401 });
+export async function GET(req: Request) {
+  const session = await requireAdmin(req);
+  if (session instanceof Response) return session;
 
   const { leads } = await listLeads();
-  const stamp = new Date().toISOString().slice(0, 10);
   return new Response(leadsToCsv(leads), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="mtk-leads-${stamp}.csv"`,
+      'Content-Disposition': `attachment; filename="mtk-leads-${todayPKT()}.csv"`,
       'Cache-Control': 'no-store',
     },
   });

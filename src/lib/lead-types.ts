@@ -1,3 +1,7 @@
+/**
+ * Lead CRM types and pure helpers. Safe to import from client and server code.
+ */
+
 export type LeadStatus = 'new' | 'queued' | 'contacted' | 'replied' | 'interested' | 'won' | 'lost' | 'skipped';
 
 export const LEAD_STATUSES: LeadStatus[] = [
@@ -21,6 +25,46 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   lost: 'Lost',
   skipped: 'Not on WhatsApp',
 };
+
+/** Statuses that mean a first message has gone out. */
+export const CONTACTED_STATUSES: LeadStatus[] = ['contacted', 'replied', 'interested', 'won', 'lost'];
+
+export type DealStage =
+  | 'none'
+  | 'discovery'
+  | 'proposal'
+  | 'negotiation'
+  | 'in_progress'
+  | 'review'
+  | 'delivered'
+  | 'on_hold';
+
+export const DEAL_STAGES: DealStage[] = [
+  'none',
+  'discovery',
+  'proposal',
+  'negotiation',
+  'in_progress',
+  'review',
+  'delivered',
+  'on_hold',
+];
+
+export const DEAL_STAGE_LABELS: Record<DealStage, string> = {
+  none: 'No deal',
+  discovery: 'Discovery call',
+  proposal: 'Proposal sent',
+  negotiation: 'Negotiation',
+  in_progress: 'Work in progress',
+  review: 'Client review',
+  delivered: 'Delivered',
+  on_hold: 'On hold',
+};
+
+/** Stages where the client has committed, so the lead counts as won. */
+export const WON_DEAL_STAGES: DealStage[] = ['in_progress', 'review', 'delivered'];
+
+export type LeadSource = 'scraper' | 'import' | 'manual' | 'website' | 'whatsapp';
 
 export type Lead = {
   id: string;
@@ -46,8 +90,64 @@ export type Lead = {
   first_contacted?: string | null;
   next_followup: string | null;
   do_not_contact: boolean;
+  source?: LeadSource | string;
+  starred?: boolean;
+  tags?: string[];
+  deal_stage?: DealStage;
+  deal_value?: number | null;
+  deal_currency?: string;
+  last_inbound_at?: string | null;
+  last_outbound_at?: string | null;
+  unread_count?: number;
   created_at: string;
   updated_at: string;
+};
+
+export type ActivityKind =
+  | 'created'
+  | 'import'
+  | 'status'
+  | 'note'
+  | 'followup'
+  | 'deal'
+  | 'message_out'
+  | 'message_in'
+  | 'opt_out'
+  | 'edit';
+
+export type LeadActivity = {
+  id: number | string;
+  lead_id: string;
+  kind: ActivityKind;
+  summary: string;
+  meta: Record<string, unknown>;
+  created_at: string;
+};
+
+export type WaMessage = {
+  id: number | string;
+  lead_id: string | null;
+  wa_id: string;
+  direction: 'in' | 'out';
+  msg_type: string;
+  body: string;
+  wamid: string | null;
+  status: 'received' | 'sent' | 'delivered' | 'read' | 'failed';
+  error: string;
+  created_at: string;
+};
+
+export type Conversation = {
+  wa_id: string;
+  lead_id: string | null;
+  name: string;
+  last_body: string;
+  last_direction: 'in' | 'out';
+  last_at: string;
+  last_inbound_at: string | null;
+  unread: number;
+  do_not_contact: boolean;
+  status: LeadStatus | null;
 };
 
 const todayDateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -62,19 +162,76 @@ export function todayPKT(date: Date = new Date()): string {
   return todayDateFormatter.format(date);
 }
 
+/** YYYY-MM-DD in Asia/Karachi, `days` from the given date. */
+export function addDaysPKT(days: number, from: Date = new Date()): string {
+  return todayPKT(new Date(from.getTime() + days * 86_400_000));
+}
+
+/** WhatsApp only allows free-form replies within 24 hours of the customer's last message. */
+export const WA_SESSION_MS = 24 * 60 * 60 * 1000;
+
+export function waWindowOpen(lastInboundAt: string | null | undefined, now = Date.now()): boolean {
+  if (!lastInboundAt) return false;
+  return now - new Date(lastInboundAt).getTime() < WA_SESSION_MS;
+}
+
+/** "Active now" means the customer wrote in the last five minutes. */
+export function customerActive(lastInboundAt: string | null | undefined, now = Date.now()): boolean {
+  if (!lastInboundAt) return false;
+  return now - new Date(lastInboundAt).getTime() < 5 * 60 * 1000;
+}
+
+/**
+ * Normalises a phone number to E.164 (`+923001234567`). Local Pakistani
+ * numbers (`0300…`) get the 92 country code. Returns '' when nothing usable.
+ */
+export function normalizePhone(raw: string | null | undefined, defaultCountry = '92'): string {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = defaultCountry + digits.slice(1);
+  else if (digits.length === 10 && digits.startsWith('3') && defaultCountry === '92') digits = `92${digits}`;
+  if (digits.length < 8 || digits.length > 15) return '';
+  return `+${digits}`;
+}
+
+/** Digits only, as WhatsApp uses for `wa_id`. */
+export function phoneDigits(raw: string | null | undefined): string {
+  return normalizePhone(raw).replace(/^\+/, '');
+}
+
 export function leadStats(leads: Lead[]) {
   const byStatus = Object.fromEntries(LEAD_STATUSES.map((status) => [status, 0])) as Record<LeadStatus, number>;
   for (const lead of leads) byStatus[lead.status] = (byStatus[lead.status] || 0) + 1;
   const today = todayPKT();
+  const contacted = leads.filter((lead) => CONTACTED_STATUSES.includes(lead.status)).length;
+  const responded = (byStatus.replied || 0) + (byStatus.interested || 0) + (byStatus.won || 0);
+  const openDeals = leads.filter(
+    (lead) => lead.deal_stage && lead.deal_stage !== 'none' && lead.deal_stage !== 'delivered',
+  );
   return {
     total: leads.length,
     byStatus,
     dueToday: leads.filter(
-      (lead) => lead.next_followup && lead.next_followup <= today && lead.status !== 'won' && lead.status !== 'lost',
+      (lead) =>
+        lead.next_followup &&
+        lead.next_followup <= today &&
+        lead.status !== 'won' &&
+        lead.status !== 'lost' &&
+        !lead.do_not_contact,
     ).length,
     queued: leads.filter((lead) => lead.status === 'queued' && !lead.do_not_contact).length,
     won: byStatus.won || 0,
-    contacted: leads.filter((lead) => ['contacted', 'replied', 'interested', 'won', 'lost'].includes(lead.status)).length,
+    contacted,
+    responded,
+    replyRate: contacted ? Math.round((responded / contacted) * 100) : 0,
+    starred: leads.filter((lead) => lead.starred).length,
+    unread: leads.reduce((sum, lead) => sum + (lead.unread_count || 0), 0),
+    openDeals: openDeals.length,
+    pipelineValue: openDeals.reduce((sum, lead) => sum + (Number(lead.deal_value) || 0), 0),
+    wonValue: leads
+      .filter((lead) => lead.deal_stage && WON_DEAL_STAGES.includes(lead.deal_stage))
+      .reduce((sum, lead) => sum + (Number(lead.deal_value) || 0), 0),
   };
 }
 
@@ -82,6 +239,19 @@ export function waLink(lead: Pick<Lead, 'phone' | 'message'>): string {
   const digits = lead.phone.replace(/\D/g, '');
   const text = lead.message?.trim() ? `?text=${encodeURIComponent(lead.message)}` : '';
   return `https://wa.me/${digits}${text}`;
+}
+
+/** Whether the UI may offer a chat/send action for this lead. */
+export function canMessage(lead: Pick<Lead, 'phone' | 'do_not_contact'>): boolean {
+  return Boolean(lead.phone) && !lead.do_not_contact;
+}
+
+export function formatMoney(value: number, currency = 'PKR'): string {
+  try {
+    return new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
+  } catch {
+    return `${currency} ${Math.round(value).toLocaleString('en-PK')}`;
+  }
 }
 
 const CSV_COLUMNS: { key: keyof Lead; label: string }[] = [
@@ -98,26 +268,43 @@ const CSV_COLUMNS: { key: keyof Lead; label: string }[] = [
   { key: 'rating', label: 'google_rating' },
   { key: 'reviews', label: 'google_review_count' },
   { key: 'status', label: 'status' },
+  { key: 'source', label: 'source' },
+  { key: 'starred', label: 'starred' },
+  { key: 'tags', label: 'tags' },
+  { key: 'deal_stage', label: 'deal_stage' },
+  { key: 'deal_value', label: 'deal_value' },
+  { key: 'deal_currency', label: 'deal_currency' },
   { key: 'channel', label: 'channel' },
+  { key: 'first_contacted', label: 'first_contacted' },
   { key: 'last_contacted', label: 'last_contacted' },
   { key: 'next_followup', label: 'next_followup' },
+  { key: 'last_inbound_at', label: 'last_reply_at' },
   { key: 'do_not_contact', label: 'do_not_contact' },
   { key: 'notes', label: 'notes' },
   { key: 'message', label: 'message' },
+  { key: 'recommended_pitch', label: 'recommended_pitch' },
   { key: 'google_maps_url', label: 'google_maps_url' },
   { key: 'created_at', label: 'created_at' },
   { key: 'updated_at', label: 'updated_at' },
 ];
 
-function csvCell(value: unknown): string {
-  const text = value === null || value === undefined ? '' : String(value);
+/**
+ * Spreadsheet apps execute cells that start with = + - @ (CSV injection).
+ * Scraped business names are untrusted, so neutralise those with a leading
+ * apostrophe. Plain phone numbers and negative numbers are left alone.
+ */
+export function csvCell(value: unknown): string {
+  let text = value === null || value === undefined ? '' : Array.isArray(value) ? value.join('; ') : String(value);
+  if (/^[=@\t\r]/.test(text) || (/^[+-]/.test(text) && !/^[+-][\d\s().-]*$/.test(text))) {
+    text = `'${text}`;
+  }
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 export function leadsToCsv(leads: Lead[]): string {
   const header = CSV_COLUMNS.map((column) => column.label).join(',');
   const rows = leads.map((lead) => CSV_COLUMNS.map((column) => csvCell(lead[column.key])).join(','));
-  return `\ufeff${[header, ...rows].join('\r\n')}\r\n`;
+  return `﻿${[header, ...rows].join('\r\n')}\r\n`;
 }
 
 export function statusTone(status: LeadStatus): string {
@@ -139,46 +326,34 @@ export function statusTone(status: LeadStatus): string {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Browser-only fallback
- *
- * With no database connected the deployed dashboard is read-only. Rather than
- * losing the user's click-through progress, the UI keeps an override map in
- * localStorage and merges it over the bundled seed. This is clearly labelled in
- * the UI: it is per-browser and disappears if site data is cleared. Connect
- * Supabase for durable, cross-device CRM state.
- * ------------------------------------------------------------------------- */
-
-export type LeadOverride = Partial<
-  Pick<Lead, 'status' | 'notes' | 'next_followup' | 'last_contacted' | 'do_not_contact' | 'message' | 'updated_at'>
->;
-
-const LOCAL_OVERRIDES_KEY = 'mtk-lead-overrides-v1';
-
-export function readLocalOverrides(): Record<string, LeadOverride> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(LOCAL_OVERRIDES_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, LeadOverride>) : {};
-  } catch {
-    return {};
+export function dealTone(stage: DealStage | undefined): string {
+  switch (stage) {
+    case 'delivered':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+    case 'in_progress':
+    case 'review':
+      return 'border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400';
+    case 'proposal':
+    case 'negotiation':
+    case 'discovery':
+      return 'border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400';
+    case 'on_hold':
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400';
+    default:
+      return 'border-line bg-muted text-fg-subtle';
   }
 }
 
-export function writeLocalOverride(id: string, patch: LeadOverride): LeadOverride {
-  const all = readLocalOverrides();
-  const merged = { ...(all[id] || {}), ...patch, updated_at: new Date().toISOString() };
-  all[id] = merged;
-  try {
-    window.localStorage.setItem(LOCAL_OVERRIDES_KEY, JSON.stringify(all));
-  } catch {
-    // Private mode / storage full: the in-memory React state still updates.
-  }
-  return merged;
+/** "5m ago", "3h ago", "2d ago" — compact relative time for lists. */
+export function timeAgo(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return '—';
+  const diff = Math.max(0, now - new Date(iso).getTime());
+  const minutes = Math.round(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
 }
-
-export function applyLocalOverrides(leads: Lead[]): Lead[] {
-  const all = readLocalOverrides();
-  return leads.map((lead) => (all[lead.id] ? { ...lead, ...all[lead.id] } : lead));
-}
-

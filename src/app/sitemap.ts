@@ -4,9 +4,10 @@ import { products } from '@/data/products';
 import { services } from '@/data/services';
 import { industries } from '@/data/content';
 import { getPosts } from '@/lib/blog';
+import { STATIC_PAGES } from '@/lib/site-paths';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const pages = ['', '/platform', '/products', '/services', '/industries', '/customers', '/pricing', '/about', '/blog', '/careers', '/contact', '/privacy', '/terms', '/cookies', '/disclaimer', '/locations', '/locations/lahore'];
+  const pages = STATIC_PAGES;
   const lastModified = new Date();
   const entry = (path: string, priority: number) => ({ url: `${site.url}${path}`, lastModified, changeFrequency: 'monthly' as const, priority });
   return [

@@ -9,6 +9,7 @@ import {
   loginThrottled,
   sessionCookieOptions,
 } from '@/lib/admin-auth';
+import { clientIp } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +24,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'local';
+  const ip = clientIp(req);
 
-  if (loginThrottled(ip)) {
+  if (await loginThrottled(ip)) {
     return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 });
   }
 
@@ -46,7 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
   }
 
-  clearLoginAttempts(ip);
+  await clearLoginAttempts(ip);
   const res = NextResponse.json({ ok: true, email: adminEmail() });
   res.cookies.set(ADMIN_COOKIE, createSessionToken(adminEmail()), sessionCookieOptions());
   return res;

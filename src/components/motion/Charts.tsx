@@ -88,7 +88,6 @@ export function Donut({ segments, size = 150, label, sub }: { segments: { value:
   const [ref, inView] = useInView<HTMLDivElement>();
   const total = segments.reduce((s, x) => s + x.value, 0);
   const r = 15.915; // circumference = 100
-  let offset = 25;
   return (
     <div ref={ref} className="flex flex-wrap items-center gap-6">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -96,7 +95,8 @@ export function Donut({ segments, size = 150, label, sub }: { segments: { value:
           <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeOpacity="0.08" strokeWidth="4" />
           {segments.map((s, i) => {
             const pct = (s.value / total) * 100;
-            const el = (
+            const offset = 25 - segments.slice(0, i).reduce((sum, prev) => sum + (prev.value / total) * 100, 0);
+            return (
               <circle
                 key={s.name}
                 cx="18"
@@ -110,8 +110,6 @@ export function Donut({ segments, size = 150, label, sub }: { segments: { value:
                 style={{ transition: `stroke-dasharray 1.2s cubic-bezier(.2,.7,.2,1) ${i * 120}ms` }}
               />
             );
-            offset -= pct;
-            return el;
           })}
         </svg>
         {label && (

@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { clearRateLimit, rateLimited } from '@/lib/rate-limit';
 
 export const ADMIN_COOKIE = 'mtk_admin';
 export const ADMIN_SESSION_HOURS = 8;
@@ -77,23 +78,38 @@ export function sessionCookieOptions() {
   };
 }
 
-// Best-effort in-memory throttle. Serverless instances are ephemeral, so this
-// stops casual bursts rather than a distributed attack (put a WAF in front for that).
-const attempts = new Map<string, { count: number; reset: number }>();
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 8;
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
 
-export function loginThrottled(ip: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(ip);
-  if (!entry || entry.reset < now) {
-    attempts.set(ip, { count: 1, reset: now + WINDOW_MS });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > MAX_ATTEMPTS;
+/** Shared across serverless instances when Supabase is connected (see rate-limit.ts). */
+export function loginThrottled(ip: string): Promise<boolean> {
+  return rateLimited(`login:${ip}`, LOGIN_WINDOW_MS, LOGIN_MAX_ATTEMPTS);
 }
 
-export function clearLoginAttempts(ip: string) {
-  attempts.delete(ip);
+export function clearLoginAttempts(ip: string): Promise<void> {
+  return clearRateLimit(`login:${ip}`);
+}
+
+/**
+ * Guards an admin API route: valid session, and for state-changing requests
+ * an Origin that matches the host (defence in depth on top of SameSite=Lax).
+ * Returns the session, or a Response to send back as-is.
+ */
+export async function requireAdmin(req: Request): Promise<AdminSession | Response> {
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    const origin = req.headers.get('origin');
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    if (origin && host) {
+      let originHost = '';
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        // fall through to the mismatch response
+      }
+      if (originHost !== host) return Response.json({ error: 'Cross-site request blocked' }, { status: 403 });
+    }
+  }
+  const session = await getAdminSession();
+  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  return session;
 }

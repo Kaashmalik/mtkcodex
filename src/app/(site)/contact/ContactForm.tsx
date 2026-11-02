@@ -29,7 +29,7 @@ export default function ContactForm() {
     e.preventDefault();
     const form = e.currentTarget;
     const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    if (data.company_website) return; // honeypot
+    if (data.company_website) return; // honeypot (also checked on the server)
     setState('sending');
     try {
       const res = await fetch('/api/contact', {

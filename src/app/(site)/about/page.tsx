@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { pageMeta } from '@/lib/seo';
 import { Eye, Gauge, HeartHandshake, Lock } from 'lucide-react';
-import { site } from '@/data/site';
 import PageHeader from '@/components/ui/PageHeader';
 import { SectionHeading } from '@/components/ui/primitives';
 import Founder from '@/components/sections/Founder';

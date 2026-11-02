@@ -7,6 +7,8 @@ import {
   referrerHost,
   visitorHash,
 } from '@/lib/analytics';
+import { clientIp } from '@/lib/rate-limit';
+import { trackablePath } from '@/lib/site-paths';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,7 @@ const WINDOW_MS = 60_000;
 const MAX_EVENTS = 90;
 const hits = new Map<string, { count: number; resetAt: number }>();
 
+// Kept in memory on purpose: a database round trip per page view is not worth it here.
 function rateLimited(key: string): boolean {
   const now = Date.now();
   const entry = hits.get(key);
@@ -34,15 +37,6 @@ function rateLimited(key: string): boolean {
   return entry.count > MAX_EVENTS;
 }
 
-function cleanPath(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  const path = value.split(/[?#]/)[0];
-  if (!path.startsWith('/') || path.length > 300) return '';
-  if (path.startsWith('//')) return '';
-  if (path.startsWith('/admin') || path.startsWith('/api')) return '';
-  return path;
-}
-
 export async function POST(req: Request) {
   if (!analyticsEnabled()) return new NextResponse(null, { status: 204 });
 
@@ -53,17 +47,14 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 204 });
   }
 
-  const path = cleanPath(body.path);
+  const path = trackablePath(body.path);
   const kind = body.kind === 'ping' ? 'ping' : 'view';
   if (!path) return new NextResponse(null, { status: 204 });
 
   const userAgent = req.headers.get('user-agent') || '';
   if (isBot(userAgent)) return new NextResponse(null, { status: 204 });
 
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown';
+  const ip = clientIp(req);
 
   if (rateLimited(ip)) return new NextResponse(null, { status: 204 });
 
