@@ -28,6 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin" className="rounded-lg px-3 py-2 text-sm font-medium text-fg-muted transition hover:bg-muted hover:text-fg">
                 Leads
               </Link>
+              <Link href="/admin/analytics" className="rounded-lg px-3 py-2 text-sm font-medium text-fg-muted transition hover:bg-muted hover:text-fg">
+                Analytics
+              </Link>
               <Link href="/admin/outreach" className="rounded-lg px-3 py-2 text-sm font-medium text-fg-muted transition hover:bg-muted hover:text-fg">
                 Outreach
               </Link>
@@ -44,6 +47,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="container-x flex items-center gap-1 pb-2 sm:hidden">
           <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm text-fg-muted hover:text-fg">
             Leads
+          </Link>
+          <Link href="/admin/analytics" className="rounded-lg px-3 py-1.5 text-sm text-fg-muted hover:text-fg">
+            Analytics
           </Link>
           <Link href="/admin/outreach" className="rounded-lg px-3 py-1.5 text-sm text-fg-muted hover:text-fg">
             Outreach

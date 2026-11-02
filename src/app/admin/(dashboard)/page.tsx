@@ -1,7 +1,9 @@
 import { getAdminSession } from '@/lib/admin-auth';
+import { getAnalyticsSummary } from '@/lib/analytics';
 import { listLeads, storageMode, type StorageMode } from '@/lib/leads';
 import Dashboard from '@/components/admin/Dashboard';
 import { AlertTriangle } from 'lucide-react';
+import type { AnalyticsSummary } from '@/lib/analytics-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +12,14 @@ export default async function AdminHomePage() {
   let mode: StorageMode = storageMode();
   let leads = [] as Awaited<ReturnType<typeof listLeads>>['leads'];
   let loadError = '';
+  let analytics: AnalyticsSummary | null = null;
+
+  try {
+    analytics = await getAnalyticsSummary();
+  } catch {
+    // Traffic is a bonus panel; a failure here must not hide the CRM.
+    analytics = null;
+  }
 
   try {
     const result = await listLeads();
@@ -37,5 +47,5 @@ export default async function AdminHomePage() {
     );
   }
 
-  return <Dashboard initialLeads={leads} mode={mode} email={session?.email || ''} />;
+  return <Dashboard initialLeads={leads} mode={mode} email={session?.email || ''} analytics={analytics} />;
 }

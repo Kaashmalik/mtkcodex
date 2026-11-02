@@ -24,6 +24,7 @@ import {
   leadStats,
   leadsToCsv,
   statusTone,
+  todayPKT,
   waLink,
   writeLocalOverride,
   type Lead,
@@ -31,7 +32,9 @@ import {
   type LeadStatus,
 } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
+import LiveTraffic from '@/components/admin/LiveTraffic';
 import { LEADS_SHEET_URL } from '@/lib/crm-links';
+import type { AnalyticsSummary } from '@/lib/analytics-types';
 import type { StorageMode } from '@/lib/leads';
 
 type Draft = Pick<Lead, 'status' | 'notes' | 'next_followup' | 'do_not_contact' | 'message'>;
@@ -48,10 +51,12 @@ export default function Dashboard({
   initialLeads,
   mode,
   email,
+  analytics,
 }: {
   initialLeads: Lead[];
   mode: StorageMode;
   email: string;
+  analytics: AnalyticsSummary | null;
 }) {
   const [leads, setLeads] = useState(initialLeads);
   const [query, setQuery] = useState('');
@@ -130,7 +135,7 @@ export default function Dashboard({
       if (!current) throw new Error('Lead not found');
       const local = { ...patch } as LeadOverride;
       if (local.status === 'contacted' && local.last_contacted === undefined) {
-        local.last_contacted = new Date().toISOString().slice(0, 10);
+        local.last_contacted = todayPKT();
       }
       const merged = writeLocalOverride(id, local);
       const next = { ...current, ...merged } as Lead;
@@ -159,7 +164,7 @@ export default function Dashboard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `mtk-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `mtk-leads-${todayPKT()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     setToast('CSV downloaded');
@@ -234,7 +239,8 @@ export default function Dashboard({
           <h1 className="mt-2 text-3xl font-bold">Pipeline</h1>
           <p className="mt-1 text-sm text-fg-muted">
             Signed in as {email}. {stats.total} leads in this workspace.
-          </p>        </div>
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href="/admin/outreach"
@@ -281,6 +287,8 @@ export default function Dashboard({
       </div>
 
       <StorageNotice mode={mode} />
+
+      <LiveTraffic initial={analytics} compact />
 
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">

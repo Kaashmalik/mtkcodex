@@ -23,11 +23,14 @@ export default function PrivacyPage() {
           form, email us or message us.
         </li>
         <li>
-          <strong>Usage data:</strong> with your consent, anonymous analytics such as pages viewed, device type, approximate location (city/country) and
-          referring site, collected through Google Analytics.
+          <strong>Usage data:</strong> we measure traffic with our own first-party analytics. It is cookieless: no cookie or identifier is stored on your
+          device. We record the page path, referring site (hostname only), device type, country and a pseudonymous visitor id that is derived from your IP
+          address and browser and is reset every day, so it cannot be traced back to you. Bots and admin pages are excluded. If you opt out of analytics,
+          set Do Not Track or send Global Privacy Control, we do not measure your visit at all.
         </li>
         <li>
-          <strong>Cookies and similar technologies:</strong> see our <a href="/cookies">Cookie Policy</a>.
+          <strong>Cookies and similar technologies:</strong> see our <a href="/cookies">Cookie Policy</a>. Third-party analytics and advertising scripts
+          only run after you accept them.
         </li>
       </ul>
 
@@ -42,8 +45,8 @@ export default function PrivacyPage() {
 
       <h2>3. Legal bases (EEA/UK visitors)</h2>
       <p>
-        We process data on the basis of your consent (analytics and advertising cookies), our legitimate interests (responding to enquiries, securing the
-        site), and the performance of a contract (delivering services you request).
+        We process data on the basis of your legitimate interests (cookieless traffic measurement that does not identify you, responding to enquiries,
+        securing the site), your consent (third-party analytics and advertising cookies) and the performance of a contract (delivering services you request).
       </p>
 
       <h2>4. Advertising and Google AdSense</h2>
@@ -67,8 +70,9 @@ export default function PrivacyPage() {
 
       <h2>5. Sharing</h2>
       <p>
-        We share information only with service providers that help us run the business — for example hosting (Vercel), email delivery (Resend), analytics
-        and advertising (Google) — under appropriate confidentiality and data-protection terms, or when required by law.
+        We share information only with service providers that help us run the business — for example hosting and database (Vercel, Supabase), email
+        delivery (Resend), and advertising (Google) — under appropriate confidentiality and data-protection terms, or when required by law. Our traffic
+        analytics run on our own infrastructure and are not shared with third parties.
       </p>
 
       <h2>6. Client project data</h2>
@@ -81,7 +85,8 @@ export default function PrivacyPage() {
       <h2>7. Retention and security</h2>
       <p>
         We keep enquiry data for as long as needed to respond and maintain our business relationship, typically no longer than 24 months after last contact.
-        We use HTTPS, access controls and reputable providers to protect information, but no method of transmission is 100% secure.
+        Cookieless traffic records are deleted after 180 days. We use HTTPS, access controls and reputable providers to protect information, but no method of
+        transmission is 100% secure.
       </p>
 
       <h2>8. Your rights</h2>

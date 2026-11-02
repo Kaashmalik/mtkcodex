@@ -6,6 +6,7 @@ import { ScrollProgress, SpotlightProvider } from '@/components/motion/Effects';
 import CookieConsent from '@/components/layout/CookieConsent';
 import MtkBot from '@/components/bot/MtkBot';
 import ThirdPartyScripts from '@/components/layout/ThirdPartyScripts';
+import AnalyticsBeacon from '@/components/analytics/AnalyticsBeacon';
 
 // Public marketing site chrome. The admin area deliberately lives outside this
 // route group so it renders without the navbar, footer, chat bot and consent UI.
@@ -28,6 +29,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <MtkBot />
       <CookieConsent />
       <ThirdPartyScripts />
+      <AnalyticsBeacon />
     </>
   );
 }

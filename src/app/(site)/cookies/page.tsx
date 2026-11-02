@@ -36,6 +36,10 @@ export default function CookiesPage() {
       </p>
 
       <h2>Cookies we use</h2>
+      <p>
+        Our traffic analytics are first-party and cookieless: no cookie, pixel or device identifier is created. You are not in the table below because
+        nothing is stored on your device for measurement.
+      </p>
       <div className="not-prose overflow-x-auto rounded-xl border border-line">
         <table className="w-full min-w-[560px] text-left text-sm">
           <thead className="bg-muted text-fg">
@@ -63,7 +67,7 @@ export default function CookiesPage() {
 
       <h2>Third-party cookies</h2>
       <p>
-        Analytics and advertising cookies are set by Google. See{' '}
+        Third-party analytics and advertising cookies are set by Google and only load after you accept them. See{' '}
         <a href="https://policies.google.com/technologies/cookies" target="_blank" rel="noopener noreferrer">
           Google&apos;s cookie information
         </a>{' '}

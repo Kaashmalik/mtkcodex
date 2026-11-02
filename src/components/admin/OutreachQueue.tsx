@@ -12,7 +12,7 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { STATUS_LABELS, applyLocalOverrides, waLink, writeLocalOverride, type Lead, type LeadOverride } from '@/lib/lead-types';
+import { STATUS_LABELS, applyLocalOverrides, todayPKT, waLink, writeLocalOverride, type Lead, type LeadOverride } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
 import { LEADS_SHEET_URL } from '@/lib/crm-links';
 import type { StorageMode } from '@/lib/leads';
@@ -75,7 +75,7 @@ export default function OutreachQueue({
     if (mode === 'readonly') {
       const local = { ...payload } as LeadOverride;
       if (local.status === 'contacted' && local.last_contacted === undefined) {
-        local.last_contacted = new Date().toISOString().slice(0, 10);
+        local.last_contacted = todayPKT();
       }
       const merged = writeLocalOverride(lead.id, local);
       setLeads((current) => current.map((row) => (row.id === lead.id ? ({ ...row, ...merged } as Lead) : row)));
@@ -273,7 +273,7 @@ export default function OutreachQueue({
                         lead,
                         { status: 'skipped' },
                         'Marked as not on WhatsApp',
-                        `Not on WhatsApp (checked ${new Date().toISOString().slice(0, 10)}).`,
+                        `Not on WhatsApp (checked ${todayPKT()}).`,
                       )
                     }
                     disabled={busyId === lead.id}

@@ -42,16 +42,30 @@ export type Lead = {
   channel: string;
   notes: string;
   last_contacted: string | null;
+  /** Stamped once, the first time the lead got a contact date. */
+  first_contacted?: string | null;
   next_followup: string | null;
   do_not_contact: boolean;
   created_at: string;
   updated_at: string;
 };
 
+const todayDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Karachi',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Today's date (YYYY-MM-DD) in the owner's timezone, Asia/Karachi. */
+export function todayPKT(date: Date = new Date()): string {
+  return todayDateFormatter.format(date);
+}
+
 export function leadStats(leads: Lead[]) {
   const byStatus = Object.fromEntries(LEAD_STATUSES.map((status) => [status, 0])) as Record<LeadStatus, number>;
   for (const lead of leads) byStatus[lead.status] = (byStatus[lead.status] || 0) + 1;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayPKT();
   return {
     total: leads.length,
     byStatus,

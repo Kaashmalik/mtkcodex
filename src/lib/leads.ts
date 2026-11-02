@@ -1,10 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import seedData from '@/data/leads.seed.json';
-import { LEAD_STATUSES, type Lead, type LeadStatus } from '@/lib/lead-types';
+import { LEAD_STATUSES, todayPKT, type Lead, type LeadStatus } from '@/lib/lead-types';
 
 export type { Lead, LeadStatus } from '@/lib/lead-types';
-export { LEAD_STATUSES, STATUS_LABELS, leadStats, waLink, leadsToCsv } from '@/lib/lead-types';
+export { LEAD_STATUSES, STATUS_LABELS, leadStats, todayPKT, waLink, leadsToCsv } from '@/lib/lead-types';
 
 export type StorageMode = 'supabase' | 'file' | 'readonly';
 
@@ -91,7 +91,7 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
 
   // Marking a lead as contacted implies today's date unless one was supplied.
   if (clean.status === 'contacted' && patch.last_contacted === undefined) {
-    clean.last_contacted = new Date().toISOString().slice(0, 10);
+    clean.last_contacted = todayPKT();
   }
 
   if (mode === 'supabase') {

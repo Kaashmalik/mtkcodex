@@ -197,7 +197,52 @@ Tip: keep the seed file to the current batch (10–25 rows). The full scraped da
 
 ---
 
-## 7. Backup & reporting
+## 7. Website analytics
+
+`/admin/analytics` (and the strip on `/admin`) shows live traffic, daily visits and
+first-message outreach in one place. It is **first-party and cookieless** — no GA4 property
+and no third-party reporting credentials needed.
+
+| Metric | Definition |
+|---|---|
+| Live now | Distinct visitors with a page view or heartbeat in the last 5 minutes |
+| Last 24 hours | Distinct visitors and page views in the trailing 24 hours |
+| Today / Yesterday | Distinct visitors since midnight Asia/Karachi |
+| Last 7 / 30 days | Distinct visitors in the trailing window |
+| First messages today | Leads whose `first_contacted` date is today (PKT) |
+
+How it works:
+
+- `src/components/analytics/AnalyticsBeacon.tsx` sends one `POST /api/track` per navigation,
+  then a heartbeat every 60s while the tab is visible. Localhost is skipped unless
+  `NEXT_PUBLIC_ANALYTICS_DEBUG=1` at build time.
+- `src/app/api/track/route.ts` drops bots (including headless browsers), `/admin`, `/api`,
+  rate-limits by IP and always answers `204` so measurement can never break a page.
+- The visitor id is `HMAC-SHA256(day, IP, user-agent, ADMIN_SESSION_SECRET)` truncated to
+  24 hex chars. It is pseudonymous, cannot be reversed and rotates daily — no cookies, no
+  localStorage, no fingerprint storage.
+- Rows live in `public.page_views` (`kind = 'view' | 'ping'`). Only `view` rows count as page
+  views; pings just keep "live now" honest. The admin reads everything through the
+  `analytics_summary()` SQL function (single round trip).
+- `first_contacted` on `leads` is stamped once by a trigger the first time a lead is
+  contacted, so follow-ups do not inflate the "first messages" number.
+
+Setup / operations:
+
+1. Apply `supabase/migrations/0002_analytics.sql` and `0003_first_contacted.sql`.
+2. Keep `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set (already required for the CRM).
+3. Retention: run `select public.analytics_prune(180);` monthly (or schedule it with
+   `pg_cron`). It refuses to delete anything newer than 7 days.
+4. To pause measurement, remove the beacon import in `src/app/(site)/layout.tsx` and redeploy;
+   the dashboard then shows zeros rather than breaking.
+
+Privacy: the beacon honours an explicit "analytics off" choice in the cookie banner, Do Not
+Track and Global Privacy Control. `/privacy` and `/cookies` describe the cookieless
+measurement. Nothing in `page_views` identifies a person, and no data is sent to third parties.
+
+---
+
+## 8. Backup & reporting
 
 - **Export CSV** (`/api/admin/leads/export`) downloads every column for the current workspace.
 - Supabase → Database → Backups covers point-in-time recovery on paid plans; for the free
@@ -207,7 +252,7 @@ Tip: keep the seed file to the current batch (10–25 rows). The full scraped da
 
 ---
 
-## 8. File map
+## 9. File map
 
 | Path | Purpose |
 |---|---|
@@ -219,13 +264,23 @@ Tip: keep the seed file to the current batch (10–25 rows). The full scraped da
 | `src/lib/lead-types.ts` | Shared types, stats, CSV, WhatsApp links |
 | `src/components/admin/` | Dashboard, outreach queue, login form |
 | `src/lib/crm-links.ts` | Google Sheet warehouse link used by both admin pages |
+| `src/lib/analytics.ts` | Page-view insert, visitor hash, bot/device/referrer helpers |
+| `src/lib/analytics-types.ts` | Shared analytics types (safe for client components) |
+| `src/app/api/track/route.ts` | Public cookieless beacon (bot filter, rate limit, always 204) |
+| `src/app/api/admin/analytics/route.ts` | Session-guarded analytics summary API |
+| `src/app/admin/(dashboard)/analytics/page.tsx` | Traffic + outreach reporting page |
+| `src/components/admin/AnalyticsDashboard.tsx` | Charts, sources, devices, recent visits |
+| `src/components/admin/LiveTraffic.tsx` | Live KPI strip (20s refresh) |
+| `src/components/analytics/AnalyticsBeacon.tsx` | Client beacon (view + heartbeat) |
+| `supabase/migrations/0002_analytics.sql` | `page_views`, `analytics_summary()`, `analytics_prune()` |
+| `supabase/migrations/0003_first_contacted.sql` | `first_contacted` column + trigger |
 | `scripts/import-sent-log.mjs` | Reconciles a WhatsApp sent CSV into the CRM (idempotent) |
 | `src/data/leads.seed.json` | Current outreach batch (committed) |
 | `supabase/migrations/0001_leads.sql` | Table, indexes, trigger, RLS |
 
 ---
 
-## 9. Compliance notes
+## 10. Compliance notes
 
 - Message only businesses where you have a legitimate reason to reach out; include a clear
   opt-out in every first message.
