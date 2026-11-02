@@ -137,6 +137,13 @@ export default function OutreachQueue({
         <div className="h-full rounded-full bg-cta transition-all" style={{ width: `${progress}%` }} />
       </div>
 
+      {mode !== 'readonly' && (
+        <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-fg-subtle">
+          <span className="size-1.5 rounded-full bg-emerald-500" />
+          {mode === 'supabase' ? 'Synced to Supabase — progress saves across devices.' : 'Saved locally in .data/leads.json.'}
+        </p>
+      )}
+
       <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
         <ShieldAlert className="mt-0.5 size-4 shrink-0" />
         <span>
