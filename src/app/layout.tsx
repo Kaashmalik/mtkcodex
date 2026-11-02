@@ -80,14 +80,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#031f2b' },
-    { media: '(prefers-color-scheme: dark)', color: '#031f2b' },
-  ],
+  // Kept in sync with the chosen theme by `ThemeToggle` and the boot script.
+  themeColor: '#031f2b',
 };
 
 // Applies the saved theme (dark by default) before paint to avoid a flash.
-const themeScript = `(function(){document.documentElement.classList.add('js');try{var t=localStorage.getItem('theme');var d=t?t==='dark':true;document.documentElement.classList.toggle('dark',d);}catch(e){document.documentElement.classList.add('dark');}})();`;
+const themeScript = `(function(){document.documentElement.classList.add('js');try{var t=localStorage.getItem('theme');var d=t?t==='dark':true;document.documentElement.classList.toggle('dark',d);var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#031f2b':'#f5f8f7';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 // Site-wide entity graph: the company, its founder and the website (referenced by @id from other pages).
 const orgJsonLd = {

@@ -100,6 +100,22 @@ body {
   overflow-x: hidden;
 }
 
+/* Long marketing pages: skip style, layout and paint for sections that are far
+   from the viewport. Theme switching changes every design token, so without this
+   the browser restyles the whole document (300ms+ on slower laptops). `auto`
+   remembers each section's real height after its first render. */
+#main > section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48rem;
+}
+
+/* Printing must include every section, not just the ones already rendered. */
+@media print {
+  #main > section {
+    content-visibility: visible;
+  }
+}
+
 h1,
 h2,
 h3,
