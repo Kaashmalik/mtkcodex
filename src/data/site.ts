@@ -6,7 +6,7 @@ export const site = {
   url: 'https://mtkcodex.tech',
   email: 'kaash0542@gmail.com',
   phone: '+92 303 8111297',
-  whatsapp: '923038111297',
+  whatsapp: '923020718182',
   location: 'Lahore, Pakistan · Serving clients worldwide',
   hours: 'Mon–Sat · Response within 12 hours',
   // Names people search for; used in structured data so Google ties them to this site.
