@@ -57,9 +57,11 @@ Local development reads `.env.local` (gitignored). Production reads Vercel env v
 |---|---|---|
 | `supabase` | Both Supabase vars set | Reads/writes the `leads` table. Recommended for production. |
 | `file` | No Supabase, not on Vercel | Reads/writes `.data/leads.json` (gitignored), seeded from `src/data/leads.seed.json`. |
-| `readonly` | No Supabase, `VERCEL` env present | Shows the bundled seed batch; status changes are rejected with a clear message. |
+| `readonly` | No Supabase, `VERCEL` env present | Shows the bundled seed batch. Sending works; status/notes edits are saved in the owner's browser (localStorage) so the queue survives reloads. Export the CSV to keep a copy. |
 
 The dashboard shows a banner explaining which mode is active.
+
+> Browser-only progress is per browser and per device. Clearing site data resets it, and it is not visible to `/api/admin/leads/export` (use the in-page **Export CSV** button, which serialises what the table shows). Connect Supabase before relying on the CRM for real pipeline reporting.
 
 ### Supabase setup (5 minutes)
 

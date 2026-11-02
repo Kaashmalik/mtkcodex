@@ -124,3 +124,47 @@ export function statusTone(status: LeadStatus): string {
       return 'border-brand/30 bg-brand-soft text-brand';
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Browser-only fallback
+ *
+ * With no database connected the deployed dashboard is read-only. Rather than
+ * losing the user's click-through progress, the UI keeps an override map in
+ * localStorage and merges it over the bundled seed. This is clearly labelled in
+ * the UI: it is per-browser and disappears if site data is cleared. Connect
+ * Supabase for durable, cross-device CRM state.
+ * ------------------------------------------------------------------------- */
+
+export type LeadOverride = Partial<
+  Pick<Lead, 'status' | 'notes' | 'next_followup' | 'last_contacted' | 'do_not_contact' | 'message' | 'updated_at'>
+>;
+
+const LOCAL_OVERRIDES_KEY = 'mtk-lead-overrides-v1';
+
+export function readLocalOverrides(): Record<string, LeadOverride> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(LOCAL_OVERRIDES_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, LeadOverride>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeLocalOverride(id: string, patch: LeadOverride): LeadOverride {
+  const all = readLocalOverrides();
+  const merged = { ...(all[id] || {}), ...patch, updated_at: new Date().toISOString() };
+  all[id] = merged;
+  try {
+    window.localStorage.setItem(LOCAL_OVERRIDES_KEY, JSON.stringify(all));
+  } catch {
+    // Private mode / storage full: the in-memory React state still updates.
+  }
+  return merged;
+}
+
+export function applyLocalOverrides(leads: Lead[]): Lead[] {
+  const all = readLocalOverrides();
+  return leads.map((lead) => (all[lead.id] ? { ...lead, ...all[lead.id] } : lead));
+}
+

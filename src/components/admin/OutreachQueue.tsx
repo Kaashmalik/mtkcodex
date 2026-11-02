@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { STATUS_LABELS, waLink, type Lead } from '@/lib/lead-types';
+import { STATUS_LABELS, applyLocalOverrides, waLink, writeLocalOverride, type Lead, type LeadOverride } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
 import type { StorageMode } from '@/lib/leads';
 
@@ -35,6 +35,12 @@ export default function OutreachQueue({
     const timer = setTimeout(() => setToast(''), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Read-only deployments keep click-through progress in this browser.
+  useEffect(() => {
+    if (mode !== 'readonly') return;
+    setLeads((rows) => applyLocalOverrides(rows));
+  }, [mode]);
 
   const queued = useMemo(
     () =>
@@ -60,14 +66,23 @@ export default function OutreachQueue({
     successMessage: string,
     note?: string,
   ) {
-    if (mode === 'readonly') {
-      setError('Read-only mode — connect Supabase to record outreach.');
-      return;
-    }
     setBusyId(lead.id);
     setError('');
+    const payload = note ? { ...patchBody, notes: [lead.notes, note].filter(Boolean).join('\n') } : patchBody;
+
+    if (mode === 'readonly') {
+      const local = { ...payload } as LeadOverride;
+      if (local.status === 'contacted' && local.last_contacted === undefined) {
+        local.last_contacted = new Date().toISOString().slice(0, 10);
+      }
+      const merged = writeLocalOverride(lead.id, local);
+      setLeads((current) => current.map((row) => (row.id === lead.id ? ({ ...row, ...merged } as Lead) : row)));
+      setToast(`${successMessage} (this browser)`);
+      setBusyId(null);
+      return;
+    }
+
     try {
-      const payload = note ? { ...patchBody, notes: [lead.notes, note].filter(Boolean).join('\n') } : patchBody;
       const res = await fetch('/api/admin/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -132,9 +147,12 @@ export default function OutreachQueue({
       </div>
 
       {mode === 'readonly' && (
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400">
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>Read-only mode. Outreach can be copied, but status changes need Supabase configured.</span>
+          <span>
+            No database connected. Sending works normally; <strong>marking progress is saved in this browser only</strong>.
+            Use <em>Export CSV</em> on the Leads page for a copy, or connect Supabase to sync across devices.
+          </span>
         </div>
       )}
 
@@ -226,7 +244,7 @@ export default function OutreachQueue({
                   <button
                     type="button"
                     onClick={() => patch(lead, { status: 'contacted' }, 'Marked as sent')}
-                    disabled={busyId === lead.id || mode === 'readonly'}
+                    disabled={busyId === lead.id}
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
                   >
                     <CheckCircle2 className="size-3.5" /> Mark sent
@@ -241,7 +259,7 @@ export default function OutreachQueue({
                         `Not on WhatsApp (checked ${new Date().toISOString().slice(0, 10)}).`,
                       )
                     }
-                    disabled={busyId === lead.id || mode === 'readonly'}
+                    disabled={busyId === lead.id}
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-red-400 hover:text-red-500 disabled:opacity-50"
                   >
                     <MessageSquareOff className="size-3.5" /> Not on WhatsApp
@@ -252,7 +270,7 @@ export default function OutreachQueue({
                 <button
                   type="button"
                   onClick={() => patch(lead, { status: 'queued' }, 'Moved back to queue')}
-                  disabled={busyId === lead.id || mode === 'readonly'}
+                  disabled={busyId === lead.id}
                   className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
                 >
                   <Send className="size-3.5" /> Requeue
@@ -285,3 +303,4 @@ export default function OutreachQueue({
     </div>
   );
 }
+

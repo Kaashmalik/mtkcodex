@@ -55,8 +55,8 @@ export default function AdminDocsPage() {
             <code>src/data/leads.seed.json</code>.
           </li>
           <li>
-            <strong>No database on Vercel:</strong> read-only view of the bundled seed batch. Nobody can lose data, but
-            status changes will not save.
+            <strong>No database on Vercel:</strong> read-only data from the bundled seed batch. Sending works, and
+            status/notes edits are kept in this browser only — use <em>Export CSV</em> to keep a copy.
           </li>
           <li>Use <em>Export CSV</em> for backups or to sync back into the scraping pipeline.</li>
         </ul>

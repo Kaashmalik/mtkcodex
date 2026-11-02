@@ -9,4 +9,4 @@ next-env.d.ts
 .serena
 .data/
 .playwright-mcp/
-.next-server.log
+.next-server*.log

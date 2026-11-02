@@ -20,10 +20,14 @@ import {
 import {
   LEAD_STATUSES,
   STATUS_LABELS,
+  applyLocalOverrides,
   leadStats,
+  leadsToCsv,
   statusTone,
   waLink,
+  writeLocalOverride,
   type Lead,
+  type LeadOverride,
   type LeadStatus,
 } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
@@ -70,6 +74,13 @@ export default function Dashboard({
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Read-only deployments have no database. Merge any progress the owner saved
+  // in this browser over the bundled seed so the queue survives a page reload.
+  useEffect(() => {
+    if (mode !== 'readonly') return;
+    setLeads((rows) => applyLocalOverrides(rows));
+  }, [mode]);
+
   const tiers = useMemo(
     () => Array.from(new Set(leads.map((lead) => lead.lead_tier).filter(Boolean))).sort(),
     [leads],
@@ -113,6 +124,20 @@ export default function Dashboard({
   }
 
   async function patchLead(id: string, patch: Record<string, unknown>, quiet = false) {
+    if (mode === 'readonly') {
+      const current = leads.find((lead) => lead.id === id);
+      if (!current) throw new Error('Lead not found');
+      const local = { ...patch } as LeadOverride;
+      if (local.status === 'contacted' && local.last_contacted === undefined) {
+        local.last_contacted = new Date().toISOString().slice(0, 10);
+      }
+      const merged = writeLocalOverride(id, local);
+      const next = { ...current, ...merged } as Lead;
+      setLeads((rows) => rows.map((row) => (row.id === id ? next : row)));
+      if (!quiet) setToast('Saved in this browser only');
+      return next;
+    }
+
     const res = await fetch('/api/admin/leads', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -125,6 +150,18 @@ export default function Dashboard({
     setLeads((current) => current.map((lead) => (lead.id === id ? data.lead! : lead)));
     if (!quiet) setToast('Saved');
     return data.lead;
+  }
+
+  /** Exports exactly what the table shows, including browser-only overrides. */
+  function downloadCsv() {
+    const blob = new Blob([leadsToCsv(leads)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mtk-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setToast('CSV downloaded');
   }
 
   async function changeStatus(lead: Lead, next: LeadStatus) {
@@ -205,12 +242,22 @@ export default function Dashboard({
           >
             <Send className="size-4" /> Outreach ({stats.queued})
           </a>
-          <a
-            href="/api/admin/leads/export"
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand"
-          >
-            <Download className="size-4" /> Export CSV
-          </a>
+          {mode === 'readonly' ? (
+            <button
+              type="button"
+              onClick={downloadCsv}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand"
+            >
+              <Download className="size-4" /> Export CSV
+            </button>
+          ) : (
+            <a
+              href="/api/admin/leads/export"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-4 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand"
+            >
+              <Download className="size-4" /> Export CSV
+            </a>
+          )}
           {mode === 'supabase' && (
             <button
               type="button"
@@ -619,11 +666,12 @@ function StorageNotice({ mode }: { mode: StorageMode }) {
     );
   }
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-600 dark:text-red-400">
+    <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
       <AlertTriangle className="mt-0.5 size-4 shrink-0" />
       <span>
-        Read-only mode: no database is connected, so CRM changes cannot be saved. Add{' '}
-        <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>, then run the SQL migration.
+        No database connected. Status changes and notes are saved{' '}
+        <strong>in this browser only</strong> (export the CSV to keep a copy). Add <code>SUPABASE_URL</code> and{' '}
+        <code>SUPABASE_SERVICE_ROLE_KEY</code> to sync across devices.
       </span>
     </div>
   );
