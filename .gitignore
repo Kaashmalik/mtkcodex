@@ -10,3 +10,6 @@ next-env.d.ts
 .data/
 .playwright-mcp/
 .next-server*.log
+
+# Netlify
+.netlify

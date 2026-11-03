@@ -6,11 +6,13 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ExternalLink } from 'lucide-react';
 import { getProduct, products } from '@/data/products';
 import { testimonials } from '@/data/content';
+import { site } from '@/data/site';
 import { Button, StatusBadge } from '@/components/ui/primitives';
 import { GithubIcon } from '@/components/ui/BrandIcons';
 import ProductDemo from '@/components/demo/ProductDemo';
 import Reveal from '@/components/ui/Reveal';
 import CtaBand from '@/components/sections/CtaBand';
+import AutomationFlow from '@/components/sections/AutomationFlow';
 
 export function generateStaticParams() {
   return products.map((p) => ({ slug: p.slug }));
@@ -89,7 +91,17 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   <GithubIcon className="size-4" /> Source
                 </Button>
               )}
+              {p.privateSource && (
+                <Button href={site.social.github} external size="lg" variant="ghost">
+                  <GithubIcon className="size-4" /> {site.founder.name.split(' ').at(-1)} on GitHub
+                </Button>
+              )}
             </div>
+            {p.privateSource && (
+              <p className="mt-3 text-sm text-fg-subtle">
+                Private codebase — a live walkthrough of the code and pipeline is available on request.
+              </p>
+            )}
           </div>
           <ProductDemo product={p} />
         </div>
@@ -124,6 +136,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           ))}
         </div>
       </section>
+
+      {p.demo === 'radar' && <AutomationFlow accent={p.accent} />}
 
       <section className="container-x grid gap-6 pb-16 lg:grid-cols-3">
         <div className="card p-7">

@@ -49,7 +49,7 @@ export default function PlatformDiagram({ cta = true }: { cta?: boolean }) {
 
         <div className="relative">
           {/* animated connector rail */}
-          <svg className="absolute left-[27px] top-6 hidden h-[calc(100%-48px)] w-4 sm:block" preserveAspectRatio="none" viewBox="0 0 4 100" aria-hidden>
+          <svg className="absolute left-[27px] top-6 h-[calc(100%-48px)] w-4" preserveAspectRatio="none" viewBox="0 0 4 100" aria-hidden>
             <line x1="2" y1="0" x2="2" y2="100" stroke="#62d84e" strokeOpacity="0.25" strokeWidth="2" vectorEffect="non-scaling-stroke" />
             <line className="flow-line" x1="2" y1="0" x2="2" y2="100" stroke="#62d84e" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </svg>

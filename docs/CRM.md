@@ -1,291 +1,372 @@
-# Lead CRM & outreach runbook
+# Lead CRM, inbox & outreach runbook
 
-The marketing site doubles as a lightweight lead CRM for MTK Codex outreach.
-Everything lives in one Next.js app — no separate admin project, no third-party CRM subscription.
+The marketing site doubles as the MTK Codex CRM. Everything lives in this Next.js app — no
+third-party CRM or chat subscription.
 
-- **Dashboard:** `/admin` (pipeline table, filters, notes, follow-ups, CSV export)
-- **Outreach desk:** `/admin/outreach` (one-click WhatsApp send queue)
-- **Playbook:** `/admin/docs` (short in-app version of this file)
-- **Login:** owner email + password from env vars
+| Page | What it does |
+|---|---|
+| `/admin` | Leads: pipeline table, filters, bulk actions, import/export, today's to-dos, live visitors |
+| `/admin/inbox` | One inbox for **website live chat, WhatsApp and email** — read and reply from anywhere |
+| `/admin/deals` | Kanban for work in progress (discovery → proposal → in progress → delivered) |
+| `/admin/outreach` | Click-to-send WhatsApp queue for cold outreach (from your own phone) |
+| `/admin/analytics` | Traffic, live visitor map with city/region/country, outreach numbers |
+| `/admin/settings` | Which channels are connected, phone/desktop alerts, webhook URLs |
+| `/admin/docs` | Short in-app playbook |
+
+On a phone, install the admin as an app (Settings → *Install on your phone*) and turn on alerts.
 
 ---
 
-## 1. Access & security
+## 1. Go-live checklist
+
+Do these in order. Steps 0–2 are required; every channel after that is optional and switches
+on by itself once its env vars are set. All values go in your host's environment variables
+(**Netlify → Project configuration → Environment variables**), then **redeploy**. For local
+testing put the same values in `.env.local` (gitignored).
+
+### Step 0 — Hosting on Netlify (free, commercial use allowed)
+
+Vercel's free Hobby plan is for non-commercial sites only, so the site runs on **Netlify's free
+plan**, which allows business sites. The code is host-neutral: visitor locations and client IPs
+are read from Netlify, Vercel or Cloudflare headers automatically, and `netlify.toml` holds the
+build settings. Do this on your laptop, in order:
+
+1. **Database first.** Finish Step 1 (Supabase + all four migrations). The site needs it to save anything.
+2. **Create the site.** [app.netlify.com](https://app.netlify.com) → *Add new project* → *Import an
+   existing project* → GitHub → pick the repository and the branch to deploy (`main` once the
+   pull request is merged). Netlify reads `netlify.toml`; don't change the build settings.
+3. **Environment variables.** *Project configuration → Environment variables → Import from a .env
+   file*. Paste the contents of your filled-in `.env.local` (see `.env.example`). Keep the scopes
+   on *Builds* **and** *Functions*. Set `NEXT_PUBLIC_SITE_URL=https://mtkcodex.tech`.
+   `NEXT_PUBLIC_*` values are baked in at build time, so **redeploy after changing them**.
+4. **Deploy** (*Deploys → Trigger deploy*). Test on the free address Netlify gives you
+   (`https://<name>.netlify.app`): open `/admin/login`, sign in, open `/admin/settings`.
+5. **Connect the domain.** *Domain management → Add a domain* → `mtkcodex.tech` (add `www` too).
+   Pick **one** DNS option:
+
+   **Option A — Netlify DNS (recommended, everything in one place)**
+   1. Choose *Set up Netlify DNS*. Netlify lists four nameservers.
+   2. Before switching, re-add your email records in Netlify DNS: the Resend DKIM (`resend._domainkey`),
+      `send` MX + TXT, receiving MX and `_dmarc` TXT from Step 3 (copy them from Resend → Domains).
+   3. At your **.tech registrar's control panel** (where you bought the domain) → *Nameservers*:
+      replace `ns1.vercel-dns.com` / `ns2.vercel-dns.com` with Netlify's four nameservers.
+   4. Wait for propagation (often under an hour, up to 24–48 h). Netlify issues the HTTPS
+      certificate automatically.
+
+   **Option B — keep DNS at Vercel (fewest changes)**
+   1. In Vercel, remove `mtkcodex.tech` from the old *project* but keep it under *Domains* (DNS stays at Vercel).
+   2. In Vercel → Domains → `mtkcodex.tech` → DNS records, point the site at Netlify using the exact
+      values Netlify's domain screen shows: an `A` record for `@` (Netlify's load balancer IP,
+      `75.2.60.5` at the time of writing) and a `CNAME` for `www` → `<name>.netlify.app`.
+      Leave the Resend email records as they are.
+
+6. **Webhooks need no change** — they use the domain: `https://mtkcodex.tech/api/email/webhook`
+   (Resend) and `https://mtkcodex.tech/api/whatsapp/webhook` (Meta). After DNS switches, send a
+   test email and a chat (Step 7).
+7. **Retire Vercel** only after the Netlify site works on `mtkcodex.tech`: delete the Vercel project
+   (with Option B keep the domain in your Vercel account, because it still serves DNS).
+8. **Watch usage.** The free plan has 300 credits a month and **pauses the site if they run out**;
+   Netlify emails you at 50 %, 75 % and 100 %. Check *Usage* weekly at first. The live chat polls
+   adaptively (3 s mid-conversation, 8 s idle, 30 s in the background, then stops) to stay light.
+   If you outgrow the free plan, the next free step is your own small server (e.g. Oracle Cloud
+   Always Free) behind Cloudflare — the app already reads Cloudflare's location headers (turn on
+   *Add visitor location headers* in Cloudflare → Rules → Managed Transforms).
+
+Limits to know: serverless functions time out after 10 s (imports are sent in chunks of 200 rows
+for that reason), and the filesystem is read-only, so production always uses Supabase.
+
+
+### Step 1 — Database (required) · Supabase free tier
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. SQL Editor → run each migration **in order**, once:
+   `supabase/migrations/0001_leads.sql` → `0002_analytics.sql` → `0003_first_contacted.sql` → `0004_crm_v2.sql`.
+   Run `0004` **before** deploying this version: the new code writes columns it adds.
+3. Project Settings → API keys → copy the **Project URL** and the **secret** key
+   (`sb_secret_…`, or a legacy `service_role` key).
+4. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+RLS is on for every table with no policies, so only the server (secret key) can read data.
+Free Supabase projects pause after a week with no activity; normal site traffic keeps it awake.
+
+### Step 2 — Admin login (required)
+
+| Variable | Value |
+|---|---|
+| `ADMIN_EMAIL` | your login email |
+| `ADMIN_PASSWORD` | a long password |
+| `ADMIN_SESSION_SECRET` | 32+ random bytes, e.g. `openssl rand -hex 32` (also keys the analytics hash and chat resume links) |
+| `NEXT_PUBLIC_SITE_URL` | `https://mtkcodex.tech` (used in alert and email links) |
+
+### Step 3 — Email: send and receive · Resend free (3,000 emails/month, 100/day)
+
+Add these records wherever your DNS lives: **Netlify DNS** after Step 0 option A, or **Vercel →
+Domains → mtkcodex.tech → DNS Records** if you kept DNS at Vercel (option B). Today the
+nameservers are `ns1/ns2.vercel-dns.com`. If you do email before moving DNS, re-create the same
+records in Netlify DNS before switching nameservers.
+
+**3a. Sending**
+
+1. Sign up at [resend.com](https://resend.com) → **Domains → Add domain** → `mtkcodex.tech`.
+2. Resend shows the records to add. Copy each **exactly** (names and values come from Resend):
+   | Type | Name (in Vercel) | Purpose |
+   |---|---|---|
+   | TXT | `resend._domainkey` | DKIM signature |
+   | MX | `send` | Bounce handling (SPF) |
+   | TXT | `send` | SPF (`v=spf1 include:… ~all`) |
+3. Recommended extra record for deliverability (add yourself):
+   `TXT` · name `_dmarc` · value `v=DMARC1; p=none; rua=mailto:<your email>`.
+4. Wait for Resend to show **Verified** (usually minutes).
+5. API Keys → create a key with **Full access** (sending + reading received mail).
+6. Set `RESEND_API_KEY` and `EMAIL_FROM` = `Kashif at MTK Codex <hello@mtkcodex.tech>`.
+   `CONTACT_TO_EMAIL` = where contact-form copies go (your Gmail).
+
+**3b. Receiving (client replies land in the inbox)**
+
+1. Resend → Domains → `mtkcodex.tech` → enable **Receiving**. Resend shows one more **MX**
+   record — add it in Vercel DNS with the name and priority shown (for the root domain the
+   name is `@`). The domain has no other mail provider, so there is no conflict.
+2. Resend → **Webhooks → Add webhook** → URL `https://mtkcodex.tech/api/email/webhook`,
+   event **`email.received`**. Copy the signing secret (`whsec_…`).
+3. Set `RESEND_WEBHOOK_SECRET` = that secret and `EMAIL_REPLY_DOMAIN` = `mtkcodex.tech`.
+4. Optional: `EMAIL_FORWARD_TO` = your Gmail, to also get a copy of every inbound email.
+
+How routing works: each lead gets a private reply address `r-<token>@mtkcodex.tech`. Replies to
+it, or any email from a lead's known address, go into that lead's email thread. Mail from
+someone new (e.g. to `hello@mtkcodex.tech`) creates a lead with source `email`.
+
+> If you later move company mail to Google Workspace on the root domain, switch Resend
+> receiving to a subdomain such as `reply.mtkcodex.tech` and set `EMAIL_REPLY_DOMAIN` to it.
+
+### Step 4 — Phone & desktop alerts (free)
+
+**Push (installed app):**
+
+1. Run `npx web-push generate-vapid-keys` once.
+2. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` = `mailto:<your email>`.
+3. On each device: open `/admin/settings` → **Turn on alerts**. On iPhone, first Share →
+   *Add to Home Screen*, open the app from the home screen, then turn on alerts (iOS 16.4+).
+
+**Telegram (optional backup, very reliable):**
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the token.
+2. Send any message to your new bot, then open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy `message.chat.id`.
+3. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+
+Alerts fire for: new live chat (and new messages, at most every 3 minutes per chat), a chat
+visitor sharing their details, WhatsApp replies, inbound emails and contact-form enquiries.
+Use **Send test alert** in Settings to check.
+
+### Step 5 — "Book a call" link (free)
+
+Create a free booking page (Cal.com, or Google Calendar → *Appointment schedule*) for a 15-minute
+video call and set `NEXT_PUBLIC_BOOKING_URL`. It appears in the live chat, the contact page and
+the inbox. This is the main way US/UK clients reach you by voice until you add a phone number.
+
+### Step 6 — WhatsApp Cloud API (optional)
+
+Keep using the Outreach desk (wa.me from your phone) until this is set up.
+
+1. [Meta for Developers](https://developers.facebook.com/apps) → create a **Business** app → add **WhatsApp**.
+2. Register a phone number for the API. It cannot also be active in the WhatsApp phone app
+   (use a second SIM, or migrate the number).
+3. Business Settings → System users → create one with a **permanent token** (scopes
+   `whatsapp_business_messaging`, `whatsapp_business_management`).
+4. Set `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` (App settings → Basic),
+   `WHATSAPP_VERIFY_TOKEN` (any random string), optionally `WHATSAPP_TEMPLATE_NAME`,
+   `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_API_VERSION` (default `v23.0`). Redeploy.
+5. WhatsApp → Configuration → webhook URL `https://mtkcodex.tech/api/whatsapp/webhook`, the same
+   verify token, subscribe to **messages**.
+
+Rules the inbox enforces: free-text replies only within 24 hours of the customer's last message;
+outside that window only an approved template can be sent. Replying `STOP` marks the lead
+do-not-contact automatically.
+
+### Step 7 — Check it works
+
+1. Open the site in a private window → chat bubble → **Chat with the team** → send a message.
+   It appears in `/admin/inbox` with the visitor's city and local time; your phone gets an alert.
+2. Reply from the inbox. With the visitor's tab closed and an email given in the chat, the reply
+   is also emailed with a "continue the chat" link.
+3. Submit the contact form → a starred lead appears on `/admin` with location and preferred channel.
+4. Email `hello@mtkcodex.tech` from another account → it lands in the inbox as an email thread.
+5. `/admin/analytics` → your visit shows on the live map.
+
+---
+
+## 2. How international clients reach you
+
+| Client | First contact | Ongoing |
+|---|---|---|
+| Pakistan | WhatsApp (outreach desk), live chat | WhatsApp / inbox |
+| UAE, Saudi, Qatar | Live chat, WhatsApp, contact form | WhatsApp or email in the inbox |
+| UK / EU | Live chat, contact form | Email in the inbox, booked video calls |
+| US / Canada | Live chat, contact form | Email in the inbox, booked video calls (no US number needed) |
+
+- The chat tells visitors when you're online, and when you're away it says when you'll be back
+  **in their own timezone** (office hours: Mon–Sat 10:00–19:00 Lahore, from `src/data/site.ts`).
+- The contact form has a country-code picker (defaults from the visitor's timezone), a
+  "best way to reach you" choice, and records their timezone.
+- Every lead shows its city, region, country and **their local time**, so you reply at a sensible hour.
+- A US/Canada SMS/call number (e.g. Quo or Twilio) can be added later without changing this setup.
+
+---
+
+## 3. Access & security
 
 | Item | Value |
 |---|---|
-| Login URL | `/admin/login` |
-| Email | `ADMIN_EMAIL` (default `kaash0542@gmail.com`) |
-| Password | `ADMIN_PASSWORD` (never committed) |
-| Session | 8-hour HMAC-signed, `HttpOnly`, `SameSite=Lax`, `Secure` in production |
-| Signing key | `ADMIN_SESSION_SECRET` (32+ random bytes) |
-| Indexing | `/admin` is `noindex` and disallowed in `robots.txt` |
+| Login | `/admin/login` with `ADMIN_EMAIL` + `ADMIN_PASSWORD` |
+| Session | 8-hour HMAC-signed cookie, `HttpOnly`, `SameSite=Lax`, `Secure` in production |
+| Writes | Session + same-origin check on every admin API call |
+| Throttling | Login, contact form and chat are rate-limited in Postgres (`rate_limit_hit`), shared across serverless instances |
+| Webhooks | WhatsApp (`X-Hub-Signature-256`) and Resend (Svix signature, 5-minute window) are verified on the raw body |
+| Chat visitors | Hold a random token; only its SHA-256 is stored. Resume links are signed and expire in 14 days |
+| Headers | CSP, HSTS, `nosniff`, frame-ancestors; `/admin` is `no-store`, `noindex` |
 
-The admin API routes (`/api/admin/*`) re-check the session cookie on every request.
-Login attempts are throttled in memory (8 per 10 minutes per IP) — enough to stop casual
-password guessing; use Vercel WAF / Cloudflare if you need stronger protection.
+Rotate the password by changing `ADMIN_PASSWORD` and redeploying. Rotating
+`ADMIN_SESSION_SECRET` signs everyone out and invalidates chat resume links.
 
-To rotate the password: change `ADMIN_PASSWORD` in Vercel → Settings → Environment Variables,
-redeploy, and sign in again. Existing sessions stay valid until they expire or
-`ADMIN_SESSION_SECRET` is rotated (rotating it signs everyone out).
-
----
-
-## 2. Environment variables
-
-```bash
-# Required for the admin login
-ADMIN_EMAIL=kaash0542@gmail.com
-ADMIN_PASSWORD=<strong password>
-ADMIN_SESSION_SECRET=<32+ random bytes, hex or base64>
-
-# Required to persist CRM changes on Vercel
-SUPABASE_URL=https://<project>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service role key>
-```
-
-Local development reads `.env.local` (gitignored). Production reads Vercel env vars.
-
-> `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS. It is only ever used in server code
-> (`src/lib/leads.ts`), never sent to the browser.
+Never commit lead data or credentials. Private batches and outreach logs live in `.data/`
+(gitignored).
 
 ---
 
-## 3. Storage modes
+## 4. Storage modes
 
 | Mode | When | Behaviour |
 |---|---|---|
-| `supabase` | Both Supabase vars set | Reads/writes the `leads` table. Recommended for production. |
-| `file` | No Supabase, not on Vercel | Reads/writes `.data/leads.json` (gitignored), seeded from `src/data/leads.seed.json`. |
-| `readonly` | No Supabase, `VERCEL` env present | Shows the bundled seed batch. Sending works; status/notes edits are saved in the owner's browser (localStorage) so the queue survives reloads. Export the CSV to keep a copy. |
+| `supabase` | Supabase vars set | Everything persists. Required for production. |
+| `file` | No Supabase, on your own machine or server | `.data/leads.json`, `activities.json`, `messages.json`, `chats.json`… The first run seeds from `.data/leads.seed.json` if present. |
+| `readonly` | No Supabase on Netlify/Vercel (serverless) | Empty, read-only CRM with a banner; live chat is hidden. |
 
-The dashboard shows a banner explaining which mode is active.
-
-> Browser-only progress is per browser and per device. Clearing site data resets it, and it is not visible to `/api/admin/leads/export` (use the in-page **Export CSV** button, which serialises what the table shows). Connect Supabase before relying on the CRM for real pipeline reporting.
-
-### Supabase setup (5 minutes)
-
-1. Create a project at [supabase.com](https://supabase.com) (free tier is enough).
-2. SQL Editor → paste and run [`supabase/migrations/0001_leads.sql`](../supabase/migrations/0001_leads.sql).
-3. Project Settings → API → copy **Project URL** and **service_role** key.
-4. Add both to Vercel env vars (and `.env.local` for local testing), then redeploy.
-5. Open `/admin` and click **Import batch** once to load the current seed leads.
-6. Confirm the footer says “Synced to Supabase.”
-
-RLS is enabled with no policies, so the anon/public key cannot read the table.
-
-### Current production setup
-
-| Item | Value |
-|---|---|
-| Supabase project | `ldfqabpupduhzdycogdn` (`https://ldfqabpupduhzdycogdn.supabase.co`) |
-| App key | Project **secret** key (`sb_secret_…`), set in Vercel for production, preview and development |
-| Table | `public.leads` (migration `0001_leads.sql` applied) |
-| Seeded | 15 leads from the 2026-11-02 batch (13 queued, 2 contacted) |
-
-Notes for future work:
-
-- Use the project **secret** key (or a legacy `service_role` JWT) as `SUPABASE_SERVICE_ROLE_KEY`.
-  The publishable/`anon` key is for browsers and is blocked by RLS; a Supabase **personal access
-  token** (`sbp_…`) only works against the Management API and is not a database key.
-- Supabase's newer `sb_secret_…` keys are not JWTs, so send them in both `apikey` and
-  `Authorization: Bearer` headers (the storage adapter already does this).
-- Values added through the Vercel CLI or dashboard can arrive with a trailing space/newline.
-  `src/lib/leads.ts` and `src/lib/admin-auth.ts` trim them; keep that behaviour when editing.
-- Rotate the secret key in Supabase → Project Settings → API keys, then update the Vercel env var
-  and redeploy. Revoke any personal access token used for one-off setup once it is no longer needed.
-
-### Google Sheet (warehouse mirror)
-
-The scraper project (`C:\Users\DELL\leads\lahore_leads`) owns a Google Sheet warehouse; the CRM is
-the working pipeline. Both admin pages link to it with the **Google Sheet** / **Warehouse sheet** button.
-
-| Item | Value |
-|---|---|
-| Spreadsheet | [`1DFO45PtJIEDnGX-xyCbzp1FTGXDVVok3Klu74ANIdJM`](https://docs.google.com/spreadsheets/d/1DFO45PtJIEDnGX-xyCbzp1FTGXDVVok3Klu74ANIdJM/edit#gid=312869384) |
-| Tab | `Leads` (~6,200 rows, full enrichment columns) |
-| Credentials | Service account JSON in the scraper repo (`credentials/`), shared with the sheet — never committed here |
-| Upstream sync | `scripts/sync_outreach_state.py --apply` in the scraper repo mirrors sends into `status`, `last_contacted`, `next_followup`, `notes` |
-
-After a sending session, bring the day's sends into the CRM:
-
-```bash
-# Dry run: shows what would change
-node scripts/import-sent-log.mjs "C:\Users\DELL\leads\lahore_leads\output\sent_2026-11-02.csv"
-
-# Write to Supabase
-node scripts/import-sent-log.mjs "C:\Users\DELL\leads\lahore_leads\output\sent_2026-11-02.csv" --apply
-```
-
-The importer reads `.env.local`, matches by `lead_id` then phone number, marks leads `contacted`,
-stamps `last_contacted`, sets `next_followup` three days out, appends
-`WhatsApp sent YYYY-MM-DD (1 touch)` and creates any missing lead with a generated opener.
-It is idempotent, so re-running the same file is safe. Options: `--date=YYYY-MM-DD`,
-`--followup-days=N`.
+Supabase notes: send the secret key in both `apikey` and `Authorization` (the adapter does);
+values pasted into Vercel may carry whitespace (trimmed in code). Lists page through PostgREST's
+1,000-row cap, so large imports show in full.
 
 ---
 
-## 4. Data model
+## 5. Data model
 
-Table: `public.leads` (one row per business)
-
-| Column | Purpose |
+| Table | Purpose |
 |---|---|
-| `id` | Stable lead id from the scraper (`gm:…`, `bl:…`) |
-| `name`, `business_type`, `area` | Identity and segmentation |
-| `phone`, `email`, `website` | Contact channels |
-| `lead_score`, `lead_tier`, `scenario` | Priority and pitch angle from scraping |
-| `rating`, `reviews`, `google_maps_url` | Social proof / Maps link |
-| `recommended_pitch` | Scraper's suggested offer |
-| `message` | The exact WhatsApp opener (editable) |
-| `status` | Pipeline stage (see below) |
-| `channel` | `whatsapp` (default), `call`, `email` |
-| `notes` | Contact person, replies, next step |
-| `last_contacted` | Date of last outbound message |
-| `next_followup` | Date the next touch is due |
-| `do_not_contact` | Hard opt-out — hides the lead from outreach |
-| `created_at`, `updated_at` | Audit timestamps |
+| `leads` | One row per business/person: profile, status, deal stage/value, tags, star, location, preferred channel, unread count |
+| `lead_activities` | Timeline: created, import, status, note, follow-up, deal, message in/out, opt-out, edit |
+| `messages` | Every message on every channel. `thread_key` = `web:<chat id>`, `wa:<digits>` or `email:<address>` |
+| `chat_sessions` | Website chat visitors: details they shared, page, device, city/region/country/timezone, presence |
+| `page_views` | Cookieless analytics incl. city/region/timezone and coordinates rounded to ~10 km |
+| `push_subscriptions` | Devices that receive alerts |
+| `rate_limits`, `app_state` | Shared throttles; admin "online" presence |
 
-### Status lifecycle
+### Status and deals
 
 ```
 new → queued → contacted → replied → interested → won
-                    ↘ lost
-queued/contacted → skipped (not on WhatsApp)
+                    ↘ lost        queued/contacted → skipped (not on WhatsApp)
 ```
 
-- `new` — imported, not reviewed
-- `queued` — approved for outreach (appears in the send queue)
-- `contacted` — first message sent (auto-stamps `last_contacted`)
-- `replied` — they answered
-- `interested` — qualified, wants a call/quote/demo
-- `won` / `lost` — closed
-- `skipped` — number not on WhatsApp or otherwise unreachable
-
-Marking `do_not_contact` hides the lead from the outreach queue regardless of status.
+Deal stages (Deals board): `discovery → proposal → negotiation → in_progress → review → delivered`
+(+ `on_hold`). Moving a deal to discovery/proposal/negotiation marks the lead **Interested**;
+in progress or later marks it **Won**. A reply on any channel moves `new/queued/contacted` to
+**Replied**. `do_not_contact` blocks queueing and sending everywhere and is set automatically on
+`STOP` / `unsubscribe`.
 
 ---
 
-## 5. Daily workflow
+## 6. Daily workflow
 
-1. Open `/admin/outreach`. Work top-down (highest lead score first).
-2. **Open chat** → WhatsApp opens with the message pre-filled.
-3. **Copy message** → paste in WhatsApp → send.
-4. **Mark sent** → status becomes `contacted`, date stamped.
-5. Open the lead in `/admin` → set **Next follow-up** to 2–3 days out → **Save changes**.
-6. If the number is invalid: **Not on WhatsApp** (records the reason and stops retries).
-7. Any opt-out (“stop”, “not interested”): tick **Do not contact** first, then mark `lost`.
+1. **Inbox first** (`/admin/inbox`): answer live chats, WhatsApp replies and emails. Keep the tab
+   (or the installed app) open — that's what shows visitors you're online.
+2. **Leads** (`/admin`): check *Follow-ups due* and *Hot leads*; star important ones; set the next
+   follow-up from the drawer (quick buttons +2d/+3d/+1w).
+3. **Outreach** (`/admin/outreach`): click-to-send cold WhatsApp from your own phone. The page
+   counts first messages today against a safe ~20/day limit.
+4. **Deals** (`/admin/deals`): drag work through the stages and keep values current.
 
-Safe volume: keep new cold conversations under ~15–20 per day per number and space them
-through the day. Automated bulk sends violate WhatsApp's terms and can get the business
-number banned — this app intentionally stays click-to-send.
-
----
-
-## 6. Adding the next batch
-
-1. Scrape/export the batch as CSV (same columns as `today_batch_check.csv`).
-2. Copy the selected rows into `src/data/leads.seed.json` (see the existing structure), one
-   object per lead with generated `message`, `status: "queued"`, timestamps.
-3. Commit the seed file. On a fresh environment the dashboard shows it automatically.
-4. With Supabase connected: `/admin` → **Import batch** (adds seed leads that are not already in the
-   CRM; existing rows keep their live status, notes and dates).
-5. Record the batch in `docs/outreach/YYYY-MM-DD-<area>.md`.
-
-Tip: keep the seed file to the current batch (10–25 rows). The full scraped database stays in
-`C:\Users\DELL\leads\lahore_leads\output\` and should not be committed to the public repo.
+Never automate bulk WhatsApp from a personal number — it gets numbers banned. The Cloud API is the
+compliant route for automation.
 
 ---
 
-## 7. Website analytics
+## 7. Import & export
 
-`/admin/analytics` (and the strip on `/admin`) shows live traffic, daily visits and
-first-message outreach in one place. It is **first-party and cookieless** — no GA4 property
-and no third-party reporting credentials needed.
-
-| Metric | Definition |
-|---|---|
-| Live now | Distinct visitors with a page view or heartbeat in the last 5 minutes |
-| Last 24 hours | Distinct visitors and page views in the trailing 24 hours |
-| Today / Yesterday | Distinct visitors since midnight Asia/Karachi |
-| Last 7 / 30 days | Distinct visitors in the trailing window |
-| First messages today | Leads whose `first_contacted` date is today (PKT) |
-
-How it works:
-
-- `src/components/analytics/AnalyticsBeacon.tsx` sends one `POST /api/track` per navigation,
-  then a heartbeat every 60s while the tab is visible. Localhost is skipped unless
-  `NEXT_PUBLIC_ANALYTICS_DEBUG=1` at build time.
-- `src/app/api/track/route.ts` drops bots (including headless browsers), `/admin`, `/api`,
-  rate-limits by IP and always answers `204` so measurement can never break a page.
-- The visitor id is `HMAC-SHA256(day, IP, user-agent, ADMIN_SESSION_SECRET)` truncated to
-  24 hex chars. It is pseudonymous, cannot be reversed and rotates daily — no cookies, no
-  localStorage, no fingerprint storage.
-- Rows live in `public.page_views` (`kind = 'view' | 'ping'`). Only `view` rows count as page
-  views; pings just keep "live now" honest. The admin reads everything through the
-  `analytics_summary()` SQL function (single round trip).
-- `first_contacted` on `leads` is stamped once by a trigger the first time a lead is
-  contacted, so follow-ups do not inflate the "first messages" number.
-
-Setup / operations:
-
-1. Apply `supabase/migrations/0002_analytics.sql` and `0003_first_contacted.sql`.
-2. Keep `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set (already required for the CRM).
-3. Retention: run `select public.analytics_prune(180);` monthly (or schedule it with
-   `pg_cron`). It refuses to delete anything newer than 7 days.
-4. To pause measurement, remove the beacon import in `src/app/(site)/layout.tsx` and redeploy;
-   the dashboard then shows zeros rather than breaking.
-
-Privacy: the beacon honours an explicit "analytics off" choice in the cookie banner, Do Not
-Track and Global Privacy Control. `/privacy` and `/cookies` describe the cookieless
-measurement. Nothing in `page_views` identifies a person, and no data is sent to third parties.
+- **Import** (`/admin` → Import): upload a CSV/TSV (Excel: *Save as CSV*) or paste a Google Sheets
+  link shared as "Anyone with the link can view". Columns are auto-matched (scraper names like
+  `phone_e164`, `lead_score` work), with a preview. Leads are de-duplicated by id, phone and email;
+  choose **Skip** or **Refresh profile** for existing ones (status, notes and history are never
+  overwritten). Local numbers `0300…` become `+92300…`. Large sheets upload in chunks of 500.
+- **Export**: *Export all* (server CSV), *Export these N* (current filters) or *Export* on a
+  selection. Cells that would run as spreadsheet formulas are neutralised.
+- `scripts/import-sent-log.mjs <sent.csv> [--apply]` reconciles a WhatsApp sent log from the
+  scraper into Supabase (dry run by default, idempotent).
+- Set `LEADS_SHEET_URL` to show a link to your private warehouse sheet in the admin.
 
 ---
 
-## 8. Backup & reporting
+## 8. Analytics & live locations
 
-- **Export CSV** (`/api/admin/leads/export`) downloads every column for the current workspace.
-- Supabase → Database → Backups covers point-in-time recovery on paid plans; for the free
-  tier, export a CSV after each batch.
-- The CSV uses the same column names as the scraper (`phone_e164`, `lead_score`, `status`,
-  `notes`, …) so it can be merged back into `mtkcodex_leads.csv`.
+`/admin/analytics` shows live visitors on a world map plus a list (city, region, country, page,
+device, their local time), top cities and countries, sources, pages and outreach numbers. The
+strip on `/admin` lists who is on the site right now.
+
+- Location comes free from the host's edge: Netlify `x-nf-geo`, Vercel `x-vercel-ip-*` or Cloudflare
+  `cf-ip*` headers (`src/lib/geo.ts` reads whichever is present). Local development has none.
+- Cookieless: the visitor id is a daily `HMAC(day, IP, user-agent, ADMIN_SESSION_SECRET)`; no
+  cookies or storage. Do Not Track, Global Privacy Control and an "analytics off" choice are honoured.
+- Only real public pages are recorded; bots, `/admin` and `/api` are ignored.
+- Retention: run `select public.analytics_prune(180);` monthly.
 
 ---
 
-## 9. File map
+## 9. Costs (start free, upgrade when needed)
+
+| Service | Free tier | When to pay |
+|---|---|---|
+| Supabase | 500 MB database | Paid plan for daily backups / more storage |
+| Resend | 3,000 emails/month, 100/day | Pro (~$20/mo) when you send more |
+| Web Push, Telegram | Free | — |
+| Cal.com / Google appointment schedule | Free | — |
+| WhatsApp Cloud API | Replies inside the 24h window are free | Template (business-initiated) messages are billed per message |
+| Netlify (hosting) | 300 credits/month, commercial use allowed; site pauses if exceeded | Pro, or move to a free VM behind Cloudflare |
+| Vercel (not used) | Hobby is non-commercial only | Pro ($20/mo) if you ever move back |
+
+Live chat polls adaptively — 3 s mid-conversation, 8 s when open but quiet, 30 s in the background
+for the unread badge, and not at all after 30 quiet minutes — so function usage stays small.
+
+---
+
+## 10. File map
 
 | Path | Purpose |
 |---|---|
-| `src/app/admin/(dashboard)/` | Protected admin pages |
-| `src/app/admin/login/` | Public login screen |
+| `src/lib/leads.ts` | Lead storage (Supabase / file / read-only), patch rules, import, activity log |
+| `src/lib/inbox.ts` | Unified inbox: conversations, WhatsApp + email inbound, sending from the dashboard |
+| `src/lib/chat.ts` | Website live chat sessions, presence, auto-replies, resume links |
+| `src/lib/message-store.ts` | Message table shared by inbox and chat |
+| `src/lib/email.ts` | Resend send/receive, webhook verification, reply parsing |
+| `src/lib/whatsapp.ts` | Cloud API send, webhook parsing, opt-out detection |
+| `src/lib/notify.ts` | Push + Telegram alerts, admin presence |
+| `src/lib/geo.ts`, `src/lib/business-hours.ts` | Visitor location (Netlify/Vercel/Cloudflare); office hours in any timezone |
+| `netlify.toml` | Netlify build settings (Node 22) |
+| `src/lib/lead-import.ts` | CSV parsing, column mapping, Google Sheet links |
+| `src/lib/lead-types.ts` | Shared types and helpers (client-safe) |
+| `src/lib/rate-limit.ts`, `src/lib/admin-auth.ts` | Throttling; sessions and `requireAdmin` |
+| `src/components/bot/` | Site chat widget (instant answers + live chat) |
+| `src/components/admin/` | Dashboard, inbox, deals, drawer, import, settings, live map |
+| `src/app/api/chat/*` | Public chat API (start, send, poll, identify, status) |
 | `src/app/api/admin/*` | Session-guarded admin API |
-| `src/lib/admin-auth.ts` | Session signing, password check, throttling |
-| `src/lib/leads.ts` | Storage adapter (Supabase / file / read-only) |
-| `src/lib/lead-types.ts` | Shared types, stats, CSV, WhatsApp links |
-| `src/components/admin/` | Dashboard, outreach queue, login form |
-| `src/lib/crm-links.ts` | Google Sheet warehouse link used by both admin pages |
-| `src/lib/analytics.ts` | Page-view insert, visitor hash, bot/device/referrer helpers |
-| `src/lib/analytics-types.ts` | Shared analytics types (safe for client components) |
-| `src/app/api/track/route.ts` | Public cookieless beacon (bot filter, rate limit, always 204) |
-| `src/app/api/admin/analytics/route.ts` | Session-guarded analytics summary API |
-| `src/app/admin/(dashboard)/analytics/page.tsx` | Traffic + outreach reporting page |
-| `src/components/admin/AnalyticsDashboard.tsx` | Charts, sources, devices, recent visits |
-| `src/components/admin/LiveTraffic.tsx` | Live KPI strip (20s refresh) |
-| `src/components/analytics/AnalyticsBeacon.tsx` | Client beacon (view + heartbeat) |
-| `supabase/migrations/0002_analytics.sql` | `page_views`, `analytics_summary()`, `analytics_prune()` |
-| `supabase/migrations/0003_first_contacted.sql` | `first_contacted` column + trigger |
-| `scripts/import-sent-log.mjs` | Reconciles a WhatsApp sent CSV into the CRM (idempotent) |
-| `src/data/leads.seed.json` | Current outreach batch (committed) |
-| `supabase/migrations/0001_leads.sql` | Table, indexes, trigger, RLS |
+| `src/app/api/{email,whatsapp}/webhook` | Signed inbound webhooks |
+| `src/app/admin/{manifest.webmanifest,sw.js}` | Installable admin app + push service worker |
+| `supabase/migrations/` | Database schema (run in order) |
+| `.data/` | Local-only private data (gitignored) |
 
 ---
 
-## 10. Compliance notes
+## 11. Compliance
 
-- Message only businesses where you have a legitimate reason to reach out; include a clear
-  opt-out in every first message.
-- Honour every STOP/opt-out immediately and record it in `do_not_contact`.
-- Do not scrape or message personal numbers at scale, and do not use unofficial WhatsApp
-  automation libraries against your business number.
-- WhatsApp Business API (Cloud API) is the compliant route if you later need true automation;
-  it requires a Meta Business account and pre-approved templates.
+- Cold outreach: legitimate business reason, a clear opt-out in every first message, at most one
+  follow-up, and honour every STOP immediately (the CRM enforces do-not-contact).
+- UK/EU visitors: the privacy policy covers live chat and city-level location; chat details are
+  used only to reply. Delete a lead on request from its drawer (removes its history).
+- Do not use unofficial WhatsApp automation libraries against your number.

@@ -23,6 +23,7 @@ const productWords: Record<string, string[]> = {
   'mtk-edu': ['school', 'edu', 'college', 'student', 'attendance', 'exam', 'fees', 'academy', 'teacher'],
   'mtk-alertpro': ['alertpro', 'camera', 'cctv', 'surveillance', 'detection', 'alarm', 'intruder'],
   'mtk-download-manager': ['download manager', 'downloader', 'youtube download', 'video download', 'yt-dlp'],
+  'mtk-radar': ['radar', 'mtk radar', 'content automation', 'video automation', 'auto publish', 'youtube automation', 'tiktok', 'instagram reels', 'social media automation', 'faceless channel'],
 };
 
 const serviceWords: Record<string, string[]> = {

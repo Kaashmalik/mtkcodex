@@ -1,17 +1,18 @@
 /**
- * Renders src/data/leads.seed.json into a markdown batch record under docs/outreach/.
+ * Renders .data/leads.seed.json into a markdown batch record under .data/outreach/.
+ * Both are gitignored: batch records contain real phone numbers and must stay private.
  *
  * Usage: node scripts/outreach-doc.mjs [YYYY-MM-DD] [slug]
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const seedPath = path.join(process.cwd(), 'src', 'data', 'leads.seed.json');
+const seedPath = path.join(process.cwd(), '.data', 'leads.seed.json');
 const leads = JSON.parse(readFileSync(seedPath, 'utf8'));
 
 const date = process.argv[2] || new Date().toISOString().slice(0, 10);
 const slug = process.argv[3] || 'batch';
-const outPath = path.join(process.cwd(), 'docs', 'outreach', `${date}-${slug}.md`);
+const outPath = path.join(process.cwd(), '.data', 'outreach', `${date}-${slug}.md`);
 
 const queued = leads.filter((lead) => lead.status === 'queued').length;
 const contacted = leads.filter((lead) => lead.status === 'contacted').length;

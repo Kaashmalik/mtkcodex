@@ -24,9 +24,16 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Usage data:</strong> we measure traffic with our own first-party analytics. It is cookieless: no cookie or identifier is stored on your
-          device. We record the page path, referring site (hostname only), device type, country and a pseudonymous visitor id that is derived from your IP
+          device. We record the page path, referring site (hostname only), device type, approximate location (city, region, country and timezone, with
+          coordinates rounded to about 10 km, as provided by our hosting provider) and a pseudonymous visitor id that is derived from your IP
           address and browser and is reset every day, so it cannot be traced back to you. Bots and admin pages are excluded. If you opt out of analytics,
           set Do Not Track or send Global Privacy Control, we do not measure your visit at all.
+        </li>
+        <li>
+          <strong>Live chat:</strong> if you use the chat on our website, we store your messages, the page you started from, your device type and
+          approximate location so our team can reply in your local time. If you share your name, email or phone in the chat, we use them only to answer
+          you, including by email if you leave the site. Your browser keeps a random chat key in local storage so you can continue the conversation;
+          clearing site data removes it.
         </li>
         <li>
           <strong>Cookies and similar technologies:</strong> see our <a href="/cookies">Cookie Policy</a>. Third-party analytics and advertising scripts

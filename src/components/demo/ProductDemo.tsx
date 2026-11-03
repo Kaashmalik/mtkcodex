@@ -515,6 +515,68 @@ function DownloaderDemo({ accent }: { accent: string }) {
   );
 }
 
+function RadarDemo({ accent }: { accent: string }) {
+  const stages = ['Discover', 'Verify', 'Script', 'Capture', 'Render', 'Approve', 'Schedule', 'Publish'];
+  const queue: [string, string, string][] = [
+    ['YouTube', 'Tue 18:00', 'Scheduled'],
+    ['TikTok', 'Tue 19:30', 'Awaiting approval'],
+    ['Instagram', 'Wed 12:00', 'Rendering'],
+  ];
+  return (
+    <BrowserFrame url="MTK Radar · Review" accent={accent}>
+      <div className="flex">
+        <Sidebar accent={accent} items={['Radar', 'Review', 'Studio', 'Queue', 'Calendar', 'Settings']} active={1} />
+        <div className="min-w-0 flex-1 space-y-3 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-display text-sm font-bold">Offer pipeline</p>
+            <span className="rounded-full px-2 py-0.5 font-semibold text-white" style={{ background: accent }}>
+              Assisted
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {stages.map((s, i) => (
+              <div key={s} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                <span
+                  className="grid size-5 place-items-center rounded-full text-[9px] font-bold text-white"
+                  style={{ background: i < 5 ? accent : i === 5 ? '#f59e0b' : 'var(--border-strong)' }}
+                >
+                  {i < 5 ? '✓' : i + 1}
+                </span>
+                <span className="w-full truncate text-center text-[9px] text-fg-subtle">{s}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-lg border border-line p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">$300 cloud credits for students</p>
+                <p className="text-fg-subtle">Official terms · snapshot 2h ago · hash 9f3a…c21</p>
+              </div>
+              <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-600">Verified</span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <Kpi label="Confidence" value="0.94" accent={accent} />
+              <Kpi label="Render QC" value="Passed" accent={accent} />
+              <Kpi label="Expires" value="18 days" accent={accent} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            {queue.map(([platform, when, state]) => (
+              <div key={platform} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2.5 py-1.5">
+                <span className="font-semibold">{platform}</span>
+                <span className="text-fg-subtle">{when}</span>
+                <span className="font-semibold" style={{ color: state === 'Scheduled' ? accent : 'var(--fg-muted)' }}>
+                  {state}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </BrowserFrame>
+  );
+}
+
 export default function ProductDemo({ product }: { product: Product }) {
   const a = product.accent;
   switch (product.demo) {
@@ -532,6 +594,8 @@ export default function ProductDemo({ product }: { product: Product }) {
       return <AlertProDemo accent={a} />;
     case 'downloader':
       return <DownloaderDemo accent={a} />;
+    case 'radar':
+      return <RadarDemo accent={a} />;
   }
 }
 

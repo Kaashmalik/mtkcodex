@@ -9,7 +9,7 @@
 &nbsp;
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](./LICENSE)
 [![Stars](https://img.shields.io/github/stars/Kaashmalik/mtkcodex?style=for-the-badge&logo=github&color=yellow)](https://github.com/Kaashmalik/mtkcodex/stargazers)
-[![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FKaashmalik%2Fmtkcodex.git)
+[![Deploy to Netlify](https://img.shields.io/badge/Deploy-Netlify-00C7B7?style=for-the-badge&logo=netlify&logoColor=white)](https://app.netlify.com/start/deploy?repository=https://github.com/Kaashmalik/mtkcodex)
 
 <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1200&color=22D3EE&center=true&vCenter=true&multiline=true&repeat=true&width=650&height=75&lines=SaaS+platforms+shipped+%E2%80%94+7+industries%2C+one+team.;Web+%2B+Mobile+%2B+Desktop+from+a+single+codebase.;Automation+that+works+while+your+business+sleeps." alt="Animated tagline" />
 
@@ -43,7 +43,7 @@ Visit the site · [Products](https://mtkcodex.tech/products) · [Services](https
 [![lucide-react](https://img.shields.io/badge/lucide--react-F56565?style=flat-square)](https://lucide.dev)
 [![marked](https://img.shields.io/badge/marked-000000?style=flat-square&logo=markdown&logoColor=white)](https://marked.js.org)
 [![Resend](https://img.shields.io/badge/Resend-black?style=flat-square&logo=resend&logoColor=white)](https://resend.com)
-[![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com)
+[![Netlify](https://img.shields.io/badge/Netlify-00C7B7?style=flat-square&logo=netlify&logoColor=white)](https://www.netlify.com)
 
 </div>
 
@@ -65,22 +65,30 @@ npm run dev                  # → http://localhost:3000
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
 | `npm run lint` | Lint with ESLint |
+| `npm test` | Unit tests (Vitest) |
+| `npm run typecheck` | TypeScript check |
 | `npm run outreach:doc` | Render `src/data/leads.seed.json` into a dated batch record under `docs/outreach/` |
 
 ### Environment Variables
 
+Copy [`.env.example`](./.env.example) to `.env.local`. The essentials:
+
 ```bash
-RESEND_API_KEY=re_xxxxxxxx   # free at resend.com — enables direct email delivery
-
-ADMIN_EMAIL=kaash0542@gmail.com   # CRM login
-ADMIN_PASSWORD=                  # strong password (required for /admin)
-ADMIN_SESSION_SECRET=            # 32+ random bytes for signed sessions
-
-SUPABASE_URL=                    # optional: persist leads on Vercel
-SUPABASE_SERVICE_ROLE_KEY=       # server-only key, never exposed to the browser
+ADMIN_EMAIL= / ADMIN_PASSWORD= / ADMIN_SESSION_SECRET=   # admin login (required)
+SUPABASE_URL= / SUPABASE_SERVICE_ROLE_KEY=               # database (required in production)
+RESEND_API_KEY= / EMAIL_FROM=                            # email from the inbox (optional)
+VAPID_PUBLIC_KEY= / VAPID_PRIVATE_KEY=                   # phone alerts (optional)
 ```
 
-Without `RESEND_API_KEY` the contact form gracefully opens the visitor's email client instead. Without Supabase the admin CRM runs on a local file in development and read-only on Vercel. See [`.env.example`](./.env.example) and [`docs/CRM.md`](./docs/CRM.md).
+Every channel (live chat, email in/out, WhatsApp Cloud API, push and Telegram alerts, booking link)
+switches on by itself once its variables are set. The step-by-step go-live checklist, including the
+DNS records for `mtkcodex.tech`, is in [`docs/CRM.md`](./docs/CRM.md).
+
+### Admin CRM
+
+`/admin` is an owner-only CRM: leads with import/export (CSV or Google Sheets), a deals board, an
+activity timeline, and **one inbox for website live chat, WhatsApp and email** with visitor
+locations, local times and phone alerts. It installs on a phone as an app.
 
 ## 🗺️ Pages
 
@@ -142,17 +150,21 @@ The site includes a private CRM for the Lahore outreach pipeline — no third-pa
 
 Each lead stores its score, source area, pre-written opener, status, notes, last contact and next follow-up. The outreach desk opens `wa.me` with the message pre-filled — sending stays manual, one at a time, which keeps the business number safe.
 
-Full runbook: [`docs/CRM.md`](./docs/CRM.md) · Batch records: [`docs/outreach/`](./docs/outreach/)
+Full runbook: [`docs/CRM.md`](./docs/CRM.md). Lead batches and outreach logs are private and stay in the gitignored `.data/` folder.
 
 ## ☁️ Deploy
 
-<a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FKaashmalik%2Fmtkcodex.git">
-  <img src="https://vercel.com/button" alt="Deploy with Vercel" />
+<a href="https://app.netlify.com/start/deploy?repository=https://github.com/Kaashmalik/mtkcodex">
+  <img src="https://www.netlify.com/img/deploy/button.svg" alt="Deploy to Netlify" />
 </a>
 
-1. Click the button above (or push and import the repo into Vercel)
-2. Add `RESEND_API_KEY` in Project → Settings → Environment Variables
+1. Click the button above (or import the repo in Netlify → *Add new project*)
+2. Run the Supabase migrations and add the environment variables (see `docs/CRM.md` → Go-live checklist)
 3. Point `mtkcodex.tech` at the project
+
+Hosting runs on **Netlify's free plan** (commercial use allowed; Vercel Hobby is non-commercial
+only). `netlify.toml` holds the build settings, and `docs/CRM.md` → *Step 0* walks through the site,
+environment variables and domain/DNS switch.
 
 ## 📄 License
 

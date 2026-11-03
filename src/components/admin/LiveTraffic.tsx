@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Eye, Radio, TrendingUp, Users } from 'lucide-react';
 import type { AnalyticsSummary } from '@/lib/analytics-types';
+import { flagEmoji, placeLabel } from '@/lib/lead-types';
 
 const number = new Intl.NumberFormat('en-US');
 const clock = new Intl.DateTimeFormat('en-GB', {
@@ -144,6 +145,22 @@ export default function LiveTraffic({
           </>
         )}
       </div>
+      {summary.live_visitors && summary.live_visitors.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="font-semibold text-fg-muted">On the site now:</span>
+          {summary.live_visitors.slice(0, 8).map((visitor) => (
+            <span key={visitor.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-elevated px-2 py-0.5 text-fg-muted">
+              <span aria-hidden>{flagEmoji(visitor.country)}</span>
+              {placeLabel(visitor) || 'Unknown'}
+              <span className="font-mono text-fg-subtle">{visitor.path}</span>
+            </span>
+          ))}
+          {summary.live_visitors.length > 8 && <span className="text-fg-subtle">+{summary.live_visitors.length - 8} more</span>}
+          <Link href="/admin/analytics" className="font-semibold text-brand hover:underline">
+            Map →
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

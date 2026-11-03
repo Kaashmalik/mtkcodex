@@ -15,6 +15,8 @@ import {
   Trophy,
 } from 'lucide-react';
 import LiveTraffic from '@/components/admin/LiveTraffic';
+import LiveMap from '@/components/admin/LiveMap';
+import { flagEmoji, placeLabel } from '@/lib/lead-types';
 import type { AnalyticsSummary } from '@/lib/analytics-types';
 
 const number = new Intl.NumberFormat('en-US');
@@ -180,6 +182,18 @@ export default function AnalyticsDashboard({
         <>
           <LiveTraffic initial={summary} summary={summary} detailed />
 
+          <section className="card mt-4 p-4">
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-sm font-bold">Live visitors by location</h2>
+              <p className="text-[11px] text-fg-subtle">City-level from the hosting edge · refreshes every 20 s</p>
+            </div>
+            {summary.live_visitors ? (
+              <LiveMap live={summary.live_visitors} points={summary.map || []} />
+            ) : (
+              <Empty text="Run supabase/migrations/0004_crm_v2.sql to record cities and show the live map." />
+            )}
+          </section>
+
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <ChartCard
               title="Last 24 hours"
@@ -249,7 +263,7 @@ export default function AnalyticsDashboard({
             </Panel>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
             <Panel title="Devices" subtitle="Last 30 days">
               {totalDevices === 0 ? (
                 <Empty text="No devices yet." />
@@ -279,9 +293,27 @@ export default function AnalyticsDashboard({
               )}
             </Panel>
 
+            <Panel title="Top cities" subtitle="Last 30 days">
+              {!summary.cities?.length ? (
+                <Empty text="Cities appear once the live site serves visitors after migration 0004." />
+              ) : (
+                <ul className="space-y-2.5">
+                  {summary.cities.map((row) => (
+                    <li key={`${row.city}-${row.region}-${row.country}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="inline-flex min-w-0 items-center gap-2">
+                        <span aria-hidden>{flagEmoji(row.country)}</span>
+                        <span className="truncate font-medium">{placeLabel(row)}</span>
+                      </span>
+                      <span className="tabular-nums text-fg-subtle">{number.format(row.visitors)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
             <Panel title="Countries" subtitle="Last 30 days">
               {summary.countries.length === 0 ? (
-                <Empty text="Location data appears once Vercel serves the site." />
+                <Empty text="Location data appears once the live site serves visitors." />
               ) : (
                 <ul className="space-y-2.5">
                   {summary.countries.map((row) => (

@@ -1,4 +1,5 @@
-import { Zap } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Radar, Zap } from 'lucide-react';
 import { automations } from '@/data/services';
 import { Button } from '@/components/ui/primitives';
 import Reveal from '@/components/ui/Reveal';
@@ -34,6 +35,21 @@ export default function Automation() {
           <Button href="/services/automation" size="lg" arrow className="mt-10">
             Automate my business
           </Button>
+          <Link
+            href="/products/mtk-radar#automation-flow"
+            className="mt-6 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-lime/50"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f97316]/20 text-[#fb923c]">
+              <Radar className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">See a full pipeline in action: MTK Radar AI</span>
+              <span className="block text-xs text-white/60">
+                9 stages from discovery to publishing on YouTube, Facebook, Instagram and TikTok — Manual, Assisted or Autopilot.
+              </span>
+            </span>
+            <ArrowRight className="ml-auto size-4 shrink-0 text-lime" />
+          </Link>
         </div>
 
         <div className="space-y-4">

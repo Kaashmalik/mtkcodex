@@ -3,15 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, LayoutGrid, RotateCcw, Send, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Bot, LayoutGrid, MessageCircle, RotateCcw, Send, X } from 'lucide-react';
 import { MENU, answer, contextReply, welcome, type BotReply } from '@/data/bot';
 import { whatsappLink } from '@/data/site';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
 import BotMascot from './BotMascot';
+import LiveChat from './LiveChat';
+import { useLiveChat } from './useLiveChat';
 
 type Msg = { from: 'bot' | 'user'; reply: BotReply };
 
 const STORE = 'mtk-bot-chat-v2';
+const HUMAN = /^(talk to a human|human|agent|real person|live chat|chat with (the )?team)$/i;
 
 /** Renders **bold** segments without injecting HTML. */
 function RichText({ text }: { text: string }) {
@@ -64,6 +67,9 @@ export default function MtkBot() {
   const inputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
   const greeted = useRef(new Set<string>());
+  const [mode, setMode] = useState<'bot' | 'live'>('bot');
+  const live = useLiveChat({ active: open && mode === 'live', pathname });
+  const liveAvailable = live.enabled === true;
 
   // Restore this tab's conversation.
   useEffect(() => {
@@ -73,13 +79,26 @@ export default function MtkBot() {
       if (localStorage.getItem('mtk-bot-teaser-closed') === '1') setTeaserClosed(true);
     } catch {}
     // Any link to #mtk-bot opens the chat.
-    const fromHash = () => location.hash === '#mtk-bot' && setOpen(true);
+    const fromHash = () => {
+      if (location.hash === '#mtk-bot') setOpen(true);
+      if (location.hash === '#live-chat') {
+        setMode('live');
+        setOpen(true);
+      }
+    };
     fromHash();
     window.addEventListener('hashchange', fromHash);
+    // A "continue the chat" link from an email opens straight into the live chat.
+    const openLive = () => {
+      setMode('live');
+      setOpen(true);
+    };
+    window.addEventListener('mtk-chat-open', openLive);
     const t = setTimeout(() => setTeaser(true), 4000);
     return () => {
       clearTimeout(t);
       window.removeEventListener('hashchange', fromHash);
+      window.removeEventListener('mtk-chat-open', openLive);
     };
   }, []);
 
@@ -110,6 +129,12 @@ export default function MtkBot() {
   const ask = (q: string) => {
     const question = q.trim().slice(0, 300);
     if (!question || typing) return;
+    // People asking for a person get one, when live chat is available.
+    if (liveAvailable && HUMAN.test(question)) {
+      setInput('');
+      setMode('live');
+      return;
+    }
     setMsgs((m) => [...m, { from: 'user', reply: { text: question } }]);
     setInput('');
     setTyping(true);
@@ -166,7 +191,7 @@ export default function MtkBot() {
           onClick={() => setOpen((o) => !o)}
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
-          aria-label={open ? 'Close MTK Bot' : 'Chat with MTK Bot'}
+          aria-label={open ? 'Close chat' : 'Open chat with MTK Codex'}
           aria-expanded={open}
           className="relative grid size-16 place-items-center rounded-full transition hover:scale-105"
         >
@@ -179,6 +204,11 @@ export default function MtkBot() {
               <span className="absolute inset-1 rounded-full bg-cta/25 blur-md" />
               <BotMascot size={64} waving={hover || teaser} />
             </>
+          )}
+          {!open && live.unread > 0 && (
+            <span className="absolute right-0 top-0 grid min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white shadow" aria-label={`${live.unread} new replies`}>
+              {live.unread}
+            </span>
           )}
         </button>
       </div>
@@ -195,19 +225,59 @@ export default function MtkBot() {
               <BotMascot size={44} follow={false} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-display font-bold">MTK Bot</p>
+              <p className="font-display font-bold">{mode === 'live' ? `Chat with ${live.agent.name}` : 'MTK Bot'}</p>
               <p className="flex items-center gap-1.5 text-xs text-white/70">
-                <span className="pulse-dot size-1.5 rounded-full bg-lime text-lime" /> Online · instant answers
+                <span className={`pulse-dot size-1.5 rounded-full ${mode === 'live' && !live.agent.online ? 'bg-amber-300 text-amber-300' : 'bg-lime text-lime'}`} />
+                {mode === 'live' ? (live.agent.online ? 'Online now' : 'Away · replies by email') : 'Online · instant answers'}
               </p>
             </div>
-            <button type="button" onClick={reset} aria-label="Restart conversation" className="grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white">
-              <RotateCcw className="size-4" />
-            </button>
+            {mode === 'bot' && (
+              <button type="button" onClick={reset} aria-label="Restart conversation" className="grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white">
+                <RotateCcw className="size-4" />
+              </button>
+            )}
             <button type="button" onClick={() => setOpen(false)} aria-label="Close chat" className="grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white">
               <X className="size-5" />
             </button>
           </div>
 
+          {liveAvailable && (
+            <div className="grid grid-cols-2 gap-1 border-b border-line bg-elevated p-1.5" role="tablist" aria-label="Chat mode">
+              {(
+                [
+                  ['bot', 'Instant answers', Bot],
+                  ['live', 'Chat with the team', MessageCircle],
+                ] as const
+              ).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === value}
+                  onClick={() => setMode(value)}
+                  className={`relative inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition ${
+                    mode === value ? 'bg-brand-soft text-brand' : 'text-fg-muted hover:text-fg'
+                  }`}
+                >
+                  <Icon className="size-3.5" /> {label}
+                  {value === 'live' && live.agent.online && <span className="size-1.5 rounded-full bg-emerald-500" />}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {mode === 'live' && liveAvailable ? (
+            <LiveChat
+              agent={live.agent}
+              messages={live.messages}
+              identified={live.identified}
+              error={live.error}
+              onSend={live.send}
+              onIdentify={live.identify}
+              onTyping={live.markTyping}
+            />
+          ) : (
+          <>
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-bg p-4" aria-live="polite">
             {msgs.map((m, i) =>
               m.from === 'bot' ? (
@@ -284,10 +354,18 @@ export default function MtkBot() {
                 <Send className="size-4" />
               </button>
             </form>
-            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-fg-subtle hover:text-brand">
-              <WhatsappIcon className="size-3.5 text-[#25d366]" /> Prefer a human? Chat with the team on WhatsApp
-            </a>
+            {liveAvailable ? (
+              <button type="button" onClick={() => setMode('live')} className="mt-2 flex w-full items-center justify-center gap-1.5 text-[11px] text-fg-subtle hover:text-brand">
+                <MessageCircle className="size-3.5 text-brand" /> Prefer a human? Chat with the team live
+              </button>
+            ) : (
+              <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-fg-subtle hover:text-brand">
+                <WhatsappIcon className="size-3.5 text-[#25d366]" /> Prefer a human? Chat with the team on WhatsApp
+              </a>
+            )}
           </div>
+          </>
+          )}
         </div>
       )}
     </>

@@ -32,7 +32,9 @@ export default function CrmShowcase() {
   const [running, setRunning] = useState(true);
   const nextId = useRef(7);
   const dealsRef = useRef(deals);
-  dealsRef.current = deals;
+  useEffect(() => {
+    dealsRef.current = deals;
+  }, [deals]);
 
   useEffect(() => {
     if (!running || prefersReducedMotion()) return;

@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const file = path.join(process.cwd(), 'src', 'data', 'leads.seed.json');
+const file = path.join(process.cwd(), '.data', 'leads.seed.json');
 const leads = JSON.parse(readFileSync(file, 'utf8'));
 
 function offer(type = '', name = '') {

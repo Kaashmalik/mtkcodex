@@ -1,4 +1,4 @@
-export type DemoKind = 'instalease' | 'dairy' | 'edu' | 'ssl' | 'laraib' | 'alertpro' | 'downloader';
+export type DemoKind = 'instalease' | 'dairy' | 'edu' | 'ssl' | 'laraib' | 'alertpro' | 'downloader' | 'radar';
 
 export interface Product {
   slug: string;
@@ -12,6 +12,8 @@ export interface Product {
   demo: DemoKind;
   liveUrl?: string;
   githubUrl?: string;
+  /** Source is private: show the founder's GitHub profile and a "walkthrough on request" note instead. */
+  privateSource?: boolean;
   status: 'Live' | 'Beta' | 'Available';
   platforms: string[];
   audience: string[];
@@ -222,6 +224,55 @@ export const products: Product[] = [
       { title: 'Native feel', text: 'System tray, toasts and a polished dark UI.' },
     ],
     stack: ['Electron 28', 'React 18', 'TypeScript', 'Vite 5', 'Tailwind CSS', 'Zustand', 'Better-SQLite3', 'yt-dlp'],
+  },
+  {
+    slug: 'mtk-radar',
+    name: 'MTK Radar AI',
+    cloud: 'Media Automation Cloud',
+    category: 'AI Content Automation Platform',
+    tagline: 'From a verified offer to a published video on four platforms — automated, with a human in control.',
+    description:
+      'Finds AI and developer offers, verifies them against official sources, turns them into real claim-walkthrough videos and schedules them to YouTube, Facebook, Instagram and TikTok.',
+    overview:
+      'MTK Radar AI watches a registry of trusted sources, keeps immutable evidence snapshots of official pages, and only lets verified offers become videos. It writes the script, records the real claim flow, renders 16:9 and 9:16 cuts with captions, measures every render for quality, then schedules platform-specific posts. One automation policy decides which stages run on their own: Manual, Assisted (the default) or Autopilot inside server-side guardrails, with a kill switch and dry-run.',
+    accent: '#f97316',
+    demo: 'radar',
+    privateSource: true,
+    status: 'Beta',
+    platforms: ['Web dashboard', 'Chrome extension', 'Background workers'],
+    audience: ['Tech content creators', 'Developer-relations teams', 'Media agencies', 'Education channels'],
+    metrics: [
+      { value: '9', label: 'Automated pipeline stages' },
+      { value: '4', label: 'Platforms published to' },
+      { value: '3', label: 'Automation modes + kill switch' },
+    ],
+    features: [
+      {
+        title: 'Trusted source radar',
+        text: 'RSS, GitHub releases, official-page watch and trend signals (Hacker News, Reddit, Hugging Face papers, Google Trends) ranked by trust tier.',
+      },
+      {
+        title: 'Evidence-first verification',
+        text: 'Immutable snapshots with URL, timestamp, publisher and content hash. Only provider-owned evidence can mark an offer verified.',
+      },
+      {
+        title: 'Script & storyboard studio',
+        text: 'Versioned claim scripts, command cards, shot lists and platform copy — English by default, Urdu voiceover opt-in.',
+      },
+      {
+        title: 'Real capture, measured renders',
+        text: 'Human-operated browser capture with redaction review, FFmpeg renders and automatic QC for black frames, freezes, silence, loudness and caption safe areas.',
+      },
+      {
+        title: 'Scheduled multi-platform publishing',
+        text: 'Official YouTube, Meta, Instagram and TikTok APIs, per-platform packages, publish windows, retries with backoff and a circuit breaker.',
+      },
+      {
+        title: 'Automation control & audit',
+        text: 'Manual, Assisted or Autopilot per stage, guardrails enforced by the API, daily caps, dry-run, a global pause switch and a full audit trail.',
+      },
+    ],
+    stack: ['Next.js', 'TypeScript', 'FastAPI', 'Python', 'PostgreSQL 16', 'Redis', 'S3 / MinIO', 'Playwright', 'FFmpeg', 'Docker', 'Chrome MV3', 'YouTube Data API', 'Meta Graph API', 'TikTok API'],
   },
 ];
 

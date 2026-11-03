@@ -46,9 +46,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
+// Dates are calendar days in the owner's timezone (Asia/Karachi), like the CRM.
+const pkt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' });
 const sendDate =
   dateArg ||
-  (path.basename(file).match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? new Date().toISOString().slice(0, 10));
+  (path.basename(file).match(/(\d{4}-\d{2}-\d{2})/)?.[1] ?? pkt.format(new Date()));
+// Noon UTC is the same calendar day in Karachi, so adding whole days is safe.
 const followupDate = new Date(`${sendDate}T12:00:00Z`);
 followupDate.setUTCDate(followupDate.getUTCDate() + followupDays);
 const followup = followupDate.toISOString().slice(0, 10);

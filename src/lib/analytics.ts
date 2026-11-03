@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import type { AnalyticsSummary } from '@/lib/analytics-types';
+import { rpc, supabase, supabaseConfigured } from '@/lib/supabase';
 
 /**
  * First-party, cookieless website analytics.
@@ -10,19 +11,16 @@ import type { AnalyticsSummary } from '@/lib/analytics-types';
  * Asia/Karachi. The admin dashboard reads aggregates through a SQL function.
  */
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
-const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-
-export function analyticsEnabled(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
+function hashSecret(): string {
+  return (process.env.ADMIN_SESSION_SECRET || '').trim();
 }
 
-function supabaseHeaders(): Record<string, string> {
-  return {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
-  };
+/**
+ * Needs the database and a real secret: without the secret the visitor hash
+ * would use a guessable key and could be linked back to an IP.
+ */
+export function analyticsEnabled(): boolean {
+  return supabaseConfigured() && Boolean(hashSecret());
 }
 
 /** YYYY-MM-DD in the owner's timezone (Asia/Karachi). */
@@ -36,8 +34,7 @@ export function localDay(date: Date = new Date()): string {
 }
 
 export function visitorHash(ip: string, userAgent: string, day: string = localDay()): string {
-  const secret = (process.env.ADMIN_SESSION_SECRET || 'mtk-analytics').trim();
-  return createHmac('sha256', secret).update(`${day}|${ip}|${userAgent}`).digest('hex').slice(0, 24);
+  return createHmac('sha256', hashSecret()).update(`${day}|${ip}|${userAgent}`).digest('hex').slice(0, 24);
 }
 
 const BOT_RE =
@@ -67,6 +64,11 @@ export type PageViewInput = {
   path: string;
   referrerHost: string;
   country: string;
+  city: string;
+  region: string;
+  timezone: string;
+  lat: number | null;
+  lng: number | null;
   device: string;
   kind: 'view' | 'ping';
   visitorId: string;
@@ -74,35 +76,27 @@ export type PageViewInput = {
 
 export async function recordPageView(view: PageViewInput): Promise<void> {
   if (!analyticsEnabled()) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/page_views`, {
+  // PostgREST uses the table's snake_case column names.
+  await supabase('page_views', {
     method: 'POST',
-    headers: { ...supabaseHeaders(), Prefer: 'return=minimal' },
-    // PostgREST uses the table's snake_case column names.
+    headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({
       path: view.path,
       referrer_host: view.referrerHost,
       country: view.country,
+      city: view.city,
+      region: view.region,
+      timezone: view.timezone,
+      lat: view.lat,
+      lng: view.lng,
       device: view.device,
       kind: view.kind,
       visitor_id: view.visitorId,
     }),
-    cache: 'no-store',
   });
-  if (!res.ok) {
-    throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  }
 }
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
   if (!analyticsEnabled()) return null;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/analytics_summary`, {
-    method: 'POST',
-    headers: supabaseHeaders(),
-    body: '{}',
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  }
-  return (await res.json()) as AnalyticsSummary;
+  return rpc<AnalyticsSummary>('analytics_summary');
 }

@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  Check,
   CheckCircle2,
   Copy,
   ExternalLink,
@@ -12,37 +11,30 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { STATUS_LABELS, applyLocalOverrides, todayPKT, waLink, writeLocalOverride, type Lead, type LeadOverride } from '@/lib/lead-types';
+import { CONTACTED_STATUSES, STATUS_LABELS, todayPKT, waLink, type Lead, type LeadStatus } from '@/lib/lead-types';
 import { WhatsappIcon } from '@/components/ui/BrandIcons';
-import { LEADS_SHEET_URL } from '@/lib/crm-links';
+import { leadsApi } from '@/components/admin/client-api';
+import { Toast, useNotice } from '@/components/admin/ui';
 import type { StorageMode } from '@/lib/leads';
+
+/** New first-contact conversations per day that keep a personal number safe. */
+const DAILY_LIMIT = 20;
 
 type Tab = 'queue' | 'sent' | 'skipped';
 
 export default function OutreachQueue({
   initialLeads,
   mode,
+  sheetUrl,
 }: {
   initialLeads: Lead[];
   mode: StorageMode;
+  sheetUrl: string;
 }) {
   const [leads, setLeads] = useState(initialLeads);
   const [tab, setTab] = useState<Tab>('queue');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [toast, setToast] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 3000);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  // Read-only deployments keep click-through progress in this browser.
-  useEffect(() => {
-    if (mode !== 'readonly') return;
-    setLeads((rows) => applyLocalOverrides(rows));
-  }, [mode]);
+  const { toast, setToast, error, setError } = useNotice();
 
   const queued = useMemo(
     () =>
@@ -54,7 +46,7 @@ export default function OutreachQueue({
   const sent = useMemo(
     () =>
       leads
-        .filter((lead) => ['contacted', 'replied', 'interested', 'won', 'lost'].includes(lead.status))
+        .filter((lead) => CONTACTED_STATUSES.includes(lead.status))
         .sort((a, b) => (b.last_contacted || '').localeCompare(a.last_contacted || '')),
     [leads],
   );
@@ -62,37 +54,12 @@ export default function OutreachQueue({
 
   const list = tab === 'queue' ? queued : tab === 'sent' ? sent : skipped;
 
-  async function patch(
-    lead: Lead,
-    patchBody: Record<string, unknown>,
-    successMessage: string,
-    note?: string,
-  ) {
+  async function patch(lead: Lead, status: LeadStatus, successMessage: string, note?: string) {
     setBusyId(lead.id);
     setError('');
-    const payload = note ? { ...patchBody, notes: [lead.notes, note].filter(Boolean).join('\n') } : patchBody;
-
-    if (mode === 'readonly') {
-      const local = { ...payload } as LeadOverride;
-      if (local.status === 'contacted' && local.last_contacted === undefined) {
-        local.last_contacted = todayPKT();
-      }
-      const merged = writeLocalOverride(lead.id, local);
-      setLeads((current) => current.map((row) => (row.id === lead.id ? ({ ...row, ...merged } as Lead) : row)));
-      setToast(`${successMessage} (this browser)`);
-      setBusyId(null);
-      return;
-    }
-
     try {
-      const res = await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: lead.id, ...payload }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { lead?: Lead; error?: string };
-      if (!res.ok || !data.lead) throw new Error(data.error || 'Could not update lead');
-      setLeads((current) => current.map((row) => (row.id === lead.id ? data.lead! : row)));
+      const updated = await leadsApi.patch(lead.id, note ? { status, append_note: note } : { status });
+      setLeads((current) => current.map((row) => (row.id === lead.id ? updated : row)));
       setToast(successMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update lead');
@@ -118,6 +85,13 @@ export default function OutreachQueue({
   const total = leads.length;
   const done = sent.length + skipped.length;
   const progress = total ? Math.round((done / total) * 100) : 0;
+  const today = todayPKT();
+  const sentToday = leads.filter(
+    (lead) =>
+      lead.first_contacted === today ||
+      (!lead.first_contacted && lead.last_contacted === today && CONTACTED_STATUSES.includes(lead.status)),
+  ).length;
+  const overLimit = sentToday >= DAILY_LIMIT;
 
   return (
     <div>
@@ -132,14 +106,19 @@ export default function OutreachQueue({
         <div className="text-right">
           <p className="text-3xl font-bold">{progress}%</p>
           <p className="text-xs text-fg-subtle">batch complete</p>
-          <a
-            href={LEADS_SHEET_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-flex items-center gap-1 text-xs text-fg-subtle transition hover:text-brand"
-          >
-            <ExternalLink className="size-3" /> Warehouse sheet
-          </a>
+          <p className={`mt-1 text-xs font-semibold ${overLimit ? 'text-red-500' : 'text-fg-muted'}`}>
+            {sentToday} / {DAILY_LIMIT} first messages today
+          </p>
+          {sheetUrl && (
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-xs text-fg-subtle transition hover:text-brand"
+            >
+              <ExternalLink className="size-3" /> Warehouse sheet
+            </a>
+          )}
         </div>
       </div>
 
@@ -163,13 +142,20 @@ export default function OutreachQueue({
         </span>
       </div>
 
+      {overLimit && (
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-600 dark:text-red-400">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>
+            You have sent {sentToday} first messages today. Stop here and continue tomorrow — bursts of new chats are the
+            main reason WhatsApp restricts numbers.
+          </span>
+        </div>
+      )}
+
       {mode === 'readonly' && (
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>
-            No database connected. Sending works normally; <strong>marking progress is saved in this browser only</strong>.
-            Use <em>Export CSV</em> on the Leads page for a copy, or connect Supabase to sync across devices.
-          </span>
+          <span>No database connected. Connect Supabase to load and track the outreach queue.</span>
         </div>
       )}
 
@@ -241,6 +227,7 @@ export default function OutreachQueue({
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              {!lead.do_not_contact && (
               <a
                 href={waLink(lead)}
                 target="_blank"
@@ -249,6 +236,7 @@ export default function OutreachQueue({
               >
                 <WhatsappIcon className="size-4" /> Open chat
               </a>
+              )}
               <button
                 type="button"
                 onClick={() => copy(lead)}
@@ -260,7 +248,7 @@ export default function OutreachQueue({
                 <>
                   <button
                     type="button"
-                    onClick={() => patch(lead, { status: 'contacted' }, 'Marked as sent')}
+                    onClick={() => patch(lead, 'contacted', 'Marked as sent')}
                     disabled={busyId === lead.id}
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
                   >
@@ -269,12 +257,7 @@ export default function OutreachQueue({
                   <button
                     type="button"
                     onClick={() =>
-                      patch(
-                        lead,
-                        { status: 'skipped' },
-                        'Marked as not on WhatsApp',
-                        `Not on WhatsApp (checked ${todayPKT()}).`,
-                      )
+                      patch(lead, 'skipped', 'Marked as not on WhatsApp', 'Not on WhatsApp (checked).')
                     }
                     disabled={busyId === lead.id}
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-red-400 hover:text-red-500 disabled:opacity-50"
@@ -283,10 +266,10 @@ export default function OutreachQueue({
                   </button>
                 </>
               )}
-              {tab !== 'queue' && (
+              {tab !== 'queue' && !lead.do_not_contact && (
                 <button
                   type="button"
-                  onClick={() => patch(lead, { status: 'queued' }, 'Moved back to queue')}
+                  onClick={() => patch(lead, 'queued', 'Moved back to queue')}
                   disabled={busyId === lead.id}
                   className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm font-semibold text-fg-muted transition hover:border-brand hover:text-brand disabled:opacity-50"
                 >
@@ -312,11 +295,7 @@ export default function OutreachQueue({
         )}
       </div>
 
-      {toast && (
-        <div className="fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-fg px-4 py-2 text-sm font-semibold text-bg shadow-float">
-          <Check className="size-4" /> {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   );
 }

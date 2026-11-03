@@ -51,17 +51,35 @@ export default function AdminDocsPage() {
             <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>.
           </li>
           <li>
-            <strong>Local dev:</strong> falls back to <code>.data/leads.json</code>, seeded from{' '}
-            <code>src/data/leads.seed.json</code>.
+            <strong>Local dev:</strong> falls back to JSON files in <code>.data/</code> (gitignored), seeded from a
+            private <code>.data/leads.seed.json</code> if present.
           </li>
           <li>
-            <strong>No database on Vercel:</strong> read-only data from the bundled seed batch. Sending works, and
-            status/notes edits are kept in this browser only — use <em>Export CSV</em> to keep a copy.
+            <strong>No database on Vercel:</strong> the CRM is empty and read-only until Supabase is connected.
+          </li>
+          <li>
+            Import new batches with <em>Import</em> on the Leads page (CSV or a Google Sheet link). Never commit lead
+            data to the repository.
           </li>
           <li>Use <em>Export CSV</em> for backups or to sync back into the scraping pipeline.</li>
           <li>
             The scraper keeps a Google Sheet warehouse (linked from this page). After sending, reconcile the
             sent log into the CRM with <code className="rounded bg-muted px-1">scripts/import-sent-log.mjs</code>.
+          </li>
+        </ul>
+      </Section>
+
+      <Section icon={MessageSquare} title="Inbox: live chat, WhatsApp and email">
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            Keep <Link href="/admin/inbox" className="font-semibold text-brand">Inbox</Link> open (or the installed app) —
+            that is what shows website visitors you are online.
+          </li>
+          <li>Every chat shows the visitor&rsquo;s city, country and local time. Reply at a sensible hour for them.</li>
+          <li>If a chat visitor has left but shared an email, your reply is emailed with a link back to the chat.</li>
+          <li>US/UK clients: reply by email and offer the booking link for a video call.</li>
+          <li>
+            Turn on phone alerts in <Link href="/admin/settings" className="font-semibold text-brand">Settings</Link>.
           </li>
         </ul>
       </Section>
@@ -103,10 +121,8 @@ export default function AdminDocsPage() {
       </Section>
 
       <div className="mt-8 rounded-xl border border-line bg-muted/40 p-4 text-xs leading-relaxed text-fg-muted">
-        Batch records are committed under <code>docs/outreach/</code> — the 15-lead batch in{' '}
-        <code>docs/outreach/2026-11-02-dha-gulberg.md</code> and the 14 sends in{' '}
-        <code>docs/outreach/2026-11-02-sent-log.md</code>. Supabase migration:{' '}
-        <code>supabase/migrations/0001_leads.sql</code>.
+        Batch records are private and live in <code>.data/outreach/</code> (gitignored). Database migrations:{' '}
+        <code>supabase/migrations/0001</code> → <code>0004</code>, run in order. Full guide: <code>docs/CRM.md</code>.
       </div>
     </div>
   );
