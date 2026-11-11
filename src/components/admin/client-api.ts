@@ -2,6 +2,7 @@ import type { ColumnMapping, RawRow } from '@/lib/lead-import';
 import type { Conversation, Lead, LeadActivity, Message } from '@/lib/lead-types';
 import type { ChannelStatus } from '@/lib/channels';
 import type { Opportunity, OpportunityStatus, Proposal, ProposalKind } from '@/lib/opportunity-types';
+import type { AutomationSettings, DailyCounters, HunterStep, RunEntry, SourceHealth } from '@/lib/hunter-automation';
 
 /** Fetch wrapper for the admin API: JSON in/out, errors carry the server message. */
 async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -143,6 +144,15 @@ export type SendProposalBody = {
   kind?: ProposalKind;
 };
 
+export type AutomationSnapshot = {
+  settings: AutomationSettings;
+  daily: DailyCounters;
+  runs: RunEntry[];
+  health: Record<string, SourceHealth>;
+  lastRefreshAt: string | null;
+  queues: { draft: number; auto: number };
+};
+
 export const hunterApi = {
   list: () => api<{ opportunities: Opportunity[] }>('/api/admin/opportunities').then((d) => d.opportunities),
   add: (job: { title: string; company?: string; url?: string; apply_email?: string; description: string }) =>
@@ -157,6 +167,16 @@ export const hunterApi = {
     api<{ proposal: Proposal; opportunity: Opportunity }>('/api/admin/opportunities/proposal', {
       method: 'POST',
       body: JSON.stringify({ id, ...request }),
+    }),
+  automation: () => api<AutomationSnapshot>('/api/admin/opportunities/automation'),
+  saveAutomation: (settings: Partial<AutomationSettings>) =>
+    api<AutomationSnapshot>('/api/admin/opportunities/automation', { method: 'PUT', body: JSON.stringify(settings) }),
+  runStep: (done: HunterStep[]) =>
+    api<{ step: HunterStep; summary: string; error?: string }>('/api/admin/opportunities/run', { method: 'POST', body: JSON.stringify({ done }) }),
+  sendBatch: (ids: string[]) =>
+    api<{ sent: string[]; failed: { id: string; error: string }[] }>('/api/admin/opportunities/send-batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
     }),
   send: (id: string, body: SendProposalBody) =>
     api<{ opportunity: Opportunity }>('/api/admin/opportunities/send', { method: 'POST', body: JSON.stringify({ id, ...body }) }).then(

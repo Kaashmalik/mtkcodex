@@ -1,6 +1,7 @@
 import { emailConfigured } from '@/lib/email';
 import { mutateTable, readTable } from '@/lib/file-store';
 import { scoreOpportunities } from '@/lib/hunter-ai';
+import { markRefreshed, recordHealth } from '@/lib/hunter-automation';
 import { keywordMatch } from '@/lib/hunter-profile';
 import { sendFromDashboard } from '@/lib/inbox';
 import { llmConfigured } from '@/lib/llm';
@@ -248,6 +249,9 @@ export async function refreshOpportunities(): Promise<RefreshReport> {
   const { maxAgeDays } = hunterSettings();
   const now = new Date().toISOString();
   const { items, reports } = await fetchAllSources();
+  await recordHealth(reports).catch((error) => console.error('hunter: health not saved', error instanceof Error ? error.message : error));
+  if (reports.every((r) => r.error)) throw new Error(`Every job board failed: ${reports.map((r) => `${r.source} (${r.error})`).join(', ')}`);
+  await markRefreshed();
   const fresh = dedupeBatch(items.filter((raw) => raw.title && isFresh(raw.posted_at, maxAgeDays)).map((raw) => toOpportunity(raw, now)));
 
   // Known rows (any status, including expired) are never re-inserted: a skip stays a skip.

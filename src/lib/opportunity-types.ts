@@ -8,6 +8,8 @@ export type OpportunitySource =
   | 'remoteok'
   | 'remotive'
   | 'arbeitnow'
+  | 'jobicy'
+  | 'weworkremotely'
   | 'hn'
   | 'greenhouse'
   | 'lever'
@@ -19,6 +21,8 @@ export const SOURCE_LABELS: Record<OpportunitySource, string> = {
   remoteok: 'Remote OK',
   remotive: 'Remotive',
   arbeitnow: 'Arbeitnow',
+  jobicy: 'Jobicy',
+  weworkremotely: 'We Work Remotely',
   hn: 'HN Who is hiring',
   greenhouse: 'Greenhouse',
   lever: 'Lever',
@@ -234,7 +238,7 @@ export function domainOf(url: string): string {
 }
 
 /** Job-board hosts are never the company's own domain. */
-const BOARD_HOSTS = /(^|\.)(remoteok\.com|remotive\.com|himalayas\.app|arbeitnow\.com|greenhouse\.io|lever\.co|ashbyhq\.com|ycombinator\.com|linkedin\.com|workable\.com|bamboohr\.com|smartrecruiters\.com|wellfound\.com|notion\.site)$/;
+const BOARD_HOSTS = /(^|\.)(remoteok\.com|remotive\.com|himalayas\.app|arbeitnow\.com|jobicy\.com|weworkremotely\.com|greenhouse\.io|lever\.co|ashbyhq\.com|ycombinator\.com|linkedin\.com|workable\.com|bamboohr\.com|smartrecruiters\.com|wellfound\.com|notion\.site)$/;
 
 export function companyDomainFrom(...urls: string[]): string {
   for (const url of urls) {

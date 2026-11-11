@@ -6,6 +6,8 @@ import { storageMode } from '@/lib/leads';
 import { llmConfigured, llmModels } from '@/lib/llm';
 import { emailsSentToday, hunterSettings, listOpportunities } from '@/lib/opportunities';
 import { hunterQueries, parseWatchlist } from '@/lib/opportunity-sources';
+import { lastRefreshAt, loadAutomation, loadDaily, loadHealth, loadRuns } from '@/lib/hunter-automation';
+import { autoQueue, draftQueue } from '@/lib/hunter-runner';
 
 export const metadata: Metadata = {
   title: 'Opportunities',
@@ -31,12 +33,22 @@ export default async function OpportunitiesPage() {
   }
 
   const [opportunities, sentToday] = result;
+  const [settings0, daily, runs, health, refreshedAt] = await Promise.all([loadAutomation(), loadDaily(), loadRuns(), loadHealth(), lastRefreshAt()]);
+  const automation = {
+    settings: settings0,
+    daily,
+    runs,
+    health,
+    lastRefreshAt: refreshedAt,
+    queues: { draft: draftQueue(opportunities, settings0).length, auto: autoQueue(opportunities, { ...settings0, mode: 'auto' as const }).length },
+  };
   const models = llmModels();
   const settings = hunterSettings();
   const profile = hunterProfile();
   return (
     <OpportunityBoard
       initial={opportunities}
+      automation={automation}
       config={{
         readOnly: storageMode() === 'readonly',
         ai: llmConfigured(),

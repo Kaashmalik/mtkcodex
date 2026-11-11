@@ -47,14 +47,47 @@ export function parseWatchlist(value = process.env.OPP_WATCHLIST || ''): WatchEn
     .slice(0, 40);
 }
 
+const RETRY_DELAY_MS = 1_200;
+
+/** Network blips, timeouts, 429 and 5xx are worth one more try; 4xx are not. */
+export function retryable(error: unknown): boolean {
+  if (error instanceof HttpError) return error.status === 429 || error.status >= 500;
+  return true;
+}
+
+class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
+
+async function getRaw(url: string, accept: string, headers: Record<string, string>, timeoutMs = TIMEOUT_MS): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': UA, Accept: accept, ...headers },
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new HttpError(res.status);
+      return res;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0 && retryable(error)) await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      else break;
+    }
+  }
+  const cause = (lastError as { cause?: { code?: string } })?.cause?.code;
+  throw new Error(lastError instanceof Error ? `${lastError.message}${cause ? ` (${cause})` : ''}` : 'request failed');
+}
+
 async function getJson<T>(url: string, headers: Record<string, string> = {}): Promise<T> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'application/json', ...headers },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as T;
+  return (await (await getRaw(url, 'application/json', headers)).json()) as T;
+}
+
+async function getText(url: string): Promise<string> {
+  return (await getRaw(url, 'application/rss+xml, application/xml, text/xml', {})).text();
 }
 
 const isoFromSeconds = (s: unknown) => (typeof s === 'number' && s > 0 ? new Date(s * 1000).toISOString() : null);
@@ -254,7 +287,106 @@ async function arbeitnow(): Promise<RawOpportunity[]> {
     }));
 }
 
-type HnItem = { id: number; text?: string | null; author?: string; created_at_i?: number; children?: HnItem[] };
+type JobicyJob = {
+  id?: number;
+  url?: string;
+  jobTitle?: string;
+  companyName?: string;
+  companyLogo?: string;
+  jobIndustry?: string[];
+  jobType?: string[];
+  jobGeo?: string;
+  jobLevel?: string;
+  jobDescription?: string;
+  jobExcerpt?: string;
+  pubDate?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
+  salaryPeriod?: string;
+};
+
+const JOBICY_TAGS = ['react', 'next.js', 'node.js', 'typescript', 'full stack', 'python'];
+
+async function jobicy(): Promise<RawOpportunity[]> {
+  const pages = await Promise.allSettled(
+    JOBICY_TAGS.map((tag) => getJson<{ jobs?: JobicyJob[] }>(`https://jobicy.com/api/v2/remote-jobs?count=50&tag=${encodeURIComponent(tag)}`)),
+  );
+  if (pages.every((page) => page.status === 'rejected')) throw new Error((pages[0] as PromiseRejectedResult).reason?.message || 'no response');
+  return pages
+    .flatMap((page) => (page.status === 'fulfilled' ? page.value.jobs || [] : []))
+    .filter((job) => job.id && job.jobTitle)
+    .map((job) => {
+      const geo = clean(job.jobGeo, 200);
+      return {
+        source: 'jobicy' as const,
+        external_id: String(job.id),
+        title: clean(job.jobTitle, 200),
+        company: clean(job.companyName, 120),
+        company_logo: clean(job.companyLogo, 600),
+        url: clean(job.url, 600),
+        location: geo || 'Anywhere',
+        location_ok: locationAllows(geo.split(/,\s*/)),
+        employment_type: strings(job.jobType).join(', '),
+        salary: salaryRange(job.salaryMin, job.salaryMax, job.salaryCurrency || 'USD', job.salaryPeriod),
+        tags: [...strings(job.jobIndustry), clean(job.jobLevel, 30)].filter(Boolean).slice(0, 6),
+        description: stripHtml(clean(job.jobDescription || job.jobExcerpt)),
+        posted_at: isoFrom(job.pubDate),
+      };
+    });
+}
+
+/** Minimal RSS reader: enough for job feeds (title, link, guid, pubDate, description, region). */
+export function parseRssItems(xml: string): Record<string, string>[] {
+  const items: Record<string, string>[] = [];
+  for (const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    const fields: Record<string, string> = {};
+    for (const field of match[1].matchAll(/<([a-z:_-]+)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+      const value = field[2].replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, '$1').trim();
+      fields[field[1].toLowerCase()] = value;
+    }
+    items.push(fields);
+  }
+  return items;
+}
+
+const WWR_FEEDS = [
+  'https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss',
+  'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss',
+  'https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss',
+];
+
+async function weWorkRemotely(): Promise<RawOpportunity[]> {
+  const feeds = await Promise.allSettled(WWR_FEEDS.map(getText));
+  if (feeds.every((feed) => feed.status === 'rejected')) throw new Error((feeds[0] as PromiseRejectedResult).reason?.message || 'no response');
+  return feeds
+    .flatMap((feed) => (feed.status === 'fulfilled' ? parseRssItems(feed.value) : []))
+    .filter((item) => item.title && (item.link || item.guid))
+    .map((item) => {
+      // Titles read "Company: Role".
+      const title = decodeEntitiesSafe(item.title);
+      const split = title.indexOf(':');
+      const region = decodeEntitiesSafe(item.region || '');
+      const link = item.link || item.guid;
+      return {
+        source: 'weworkremotely' as const,
+        external_id: link.replace(/^https?:\/\/[^/]+/, '').slice(0, 200),
+        title: (split > 0 ? title.slice(split + 1) : title).trim().slice(0, 200),
+        company: (split > 0 ? title.slice(0, split) : '').trim().slice(0, 120),
+        url: link,
+        location: region || 'Anywhere',
+        location_ok: locationAllows(region.split(/,\s*/)),
+        employment_type: decodeEntitiesSafe(item.type || ''),
+        tags: decodeEntitiesSafe(item.category || '') ? [decodeEntitiesSafe(item.category)] : [],
+        description: stripHtml(decodeEntitiesSafe(item.description || '')),
+        posted_at: isoFrom(item.pubdate),
+      };
+    });
+}
+
+const decodeEntitiesSafe = (text: string) => clean(stripHtml(text), 20_000);
+
+type HnItem ={ id: number; text?: string | null; author?: string; created_at_i?: number; children?: HnItem[] };
 
 /** "Company | Role | REMOTE | Salary | link" — the convention most posts follow. */
 export function parseHnPost(text: string): { company: string; title: string; location: string; salary: string } {
@@ -424,6 +556,8 @@ const SOURCES: { name: SourceReport['source']; run: () => Promise<RawOpportunity
   { name: 'remoteok', run: remoteok },
   { name: 'remotive', run: remotive },
   { name: 'arbeitnow', run: arbeitnow },
+  { name: 'jobicy', run: jobicy },
+  { name: 'weworkremotely', run: weWorkRemotely },
   { name: 'hn', run: hackerNews },
   { name: 'watchlist', run: watchlist },
 ];

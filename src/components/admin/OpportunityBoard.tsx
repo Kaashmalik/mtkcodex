@@ -31,7 +31,8 @@ import {
   type OpportunityStatus,
   type Proposal,
 } from '@/lib/opportunity-types';
-import { hunterApi, type ProposalRequest } from '@/components/admin/client-api';
+import { hunterApi, type AutomationSnapshot, type ProposalRequest } from '@/components/admin/client-api';
+import HunterAutomation from '@/components/admin/HunterAutomation';
 import {
   ErrorBanner,
   Field,
@@ -80,7 +81,7 @@ const followupDue = (o: Opportunity, now: number) => o.status === 'sent' && Bool
 const shortModel = (model: string) => model.split('/').pop() || model;
 
 /** MTK Hunter: fresh remote jobs scored against your profile, with AI proposals you review and send. */
-export default function OpportunityBoard({ initial, config }: { initial: Opportunity[]; config: HunterConfig }) {
+export default function OpportunityBoard({ initial, automation, config }: { initial: Opportunity[]; automation: AutomationSnapshot; config: HunterConfig }) {
   const [items, setItems] = useState(initial);
   const [tab, setTab] = useState<Tab>('matches');
   const [query, setQuery] = useState('');
@@ -234,6 +235,16 @@ export default function OpportunityBoard({ initial, config }: { initial: Opportu
         <StatCard icon={MessageSquareReply} label="Replies" value={stats.replies} hint={`${stats.replyRate}% reply rate`} onClick={() => setTab('replied')} active={tab === 'replied'} />
         <StatCard icon={CalendarClock} label="Follow-ups due" value={stats.due} onClick={() => setTab('followups')} active={tab === 'followups'} />
       </div>
+
+      <HunterAutomation
+        initial={automation}
+        ai={config.ai}
+        email={config.email}
+        readOnly={config.readOnly}
+        onRan={async () => setItems(await hunterApi.list())}
+        notify={setToast}
+        fail={fail}
+      />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
 

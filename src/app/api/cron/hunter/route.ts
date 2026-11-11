@@ -1,19 +1,20 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import type { HunterStep } from '@/lib/hunter-automation';
 import { hunterFailure } from '@/lib/hunter-http';
-import { llmConfigured } from '@/lib/llm';
-import { refreshOpportunities, scoreNext } from '@/lib/opportunities';
+import { runStep } from '@/lib/hunter-runner';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 26;
 
 /**
- * Daily MTK Hunter run, called by netlify/functions/hunter-daily.mjs (or any
- * cron service) with `Authorization: Bearer $CRON_SECRET`.
- *   ?step=refresh  fetch every board
- *   ?step=score    AI-score one batch (call repeatedly while remaining > 0)
- * Steps are separate requests so each stays inside the host's function time limit.
+ * Hourly MTK Hunter run, called by netlify/functions/hunter-daily.mjs (or any
+ * cron service) with `Authorization: Bearer $CRON_SECRET`. Each request does
+ * one step (fetch, score, draft or send); the caller repeats with
+ * `?done=<steps so far>` until the answer is `idle`.
  */
+
+const STEPS: HunterStep[] = ['refresh', 'score', 'draft', 'send', 'idle'];
 
 function authorised(req: Request): boolean {
   const secret = (process.env.CRON_SECRET || '').trim();
@@ -26,15 +27,13 @@ function authorised(req: Request): boolean {
 
 export async function GET(req: Request) {
   if (!authorised(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const step = new URL(req.url).searchParams.get('step') || 'refresh';
+  const done = (new URL(req.url).searchParams.get('done') || '')
+    .split(',')
+    .filter((s): s is HunterStep => STEPS.includes(s as HunterStep))
+    .slice(0, 20);
   try {
-    if (step === 'refresh') return NextResponse.json(await refreshOpportunities());
-    if (step === 'score') {
-      if (!llmConfigured()) return NextResponse.json({ scored: 0, remaining: 0, skipped: 'AI not configured' });
-      return NextResponse.json(await scoreNext());
-    }
-    return NextResponse.json({ error: 'Unknown step' }, { status: 400 });
+    return NextResponse.json(await runStep('cron', done));
   } catch (error) {
-    return hunterFailure(error, `cron ${step} failed`);
+    return hunterFailure(error, 'cron step failed');
   }
 }
