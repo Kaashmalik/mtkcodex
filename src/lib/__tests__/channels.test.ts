@@ -103,7 +103,7 @@ describe('geo', () => {
   it('prefers the edge-provided client IP', async () => {
     const { clientIp } = await import('@/lib/rate-limit');
     const req = new Request('https://x.test', { headers: { 'x-forwarded-for': '10.0.0.1, 1.2.3.4', 'x-nf-client-connection-ip': '203.0.113.9' } });
-    expect(clientIp(req)).toBe('203.0.113.9');
+    expect(clientIp(req, { NETLIFY: 'true' })).toBe('203.0.113.9');
   });
   it('rejects junk timezones', () => {
     expect(isTimeZone('Asia/Karachi')).toBe(true);

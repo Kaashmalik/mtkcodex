@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 26;
 
 /**
- * Hourly MTK Hunter run, called by netlify/functions/hunter-daily.mjs (or any
+ * Hourly MTK Hunter run, called by netlify/functions/hunter-run.mjs (or any
  * cron service) with `Authorization: Bearer $CRON_SECRET`. Each request does
  * one step (fetch, score, draft or send); the caller repeats with
  * `?done=<steps so far>` until the answer is `idle`.

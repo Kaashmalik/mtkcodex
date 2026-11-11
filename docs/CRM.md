@@ -330,20 +330,41 @@ tailored proposal, and sends it after you review it. Nothing is ever sent withou
 **Setup (10 minutes)**
 1. Run `supabase/migrations/0005_opportunities.sql` in the Supabase SQL editor.
 2. Create a River key at https://console.river.ai/keys and set `LLM_API_KEY` (base URL and models default to River + DeepSeek/Kimi).
-3. Set `CRON_SECRET` (`openssl rand -hex 32`). Netlify runs `netlify/functions/hunter-daily.mjs` at 08:00 PKT.
+3. Set `CRON_SECRET` (`openssl rand -hex 32`). Netlify runs `netlify/functions/hunter-run.mjs` every hour
+   (at :07). Each run does small steps — fetch (every 6 h), AI score, draft, and in auto mode one send — so
+   nothing hits the function time limit and work is spread through the day.
 4. Email: proposals use Resend like the Inbox. Set `OPP_EMAIL_FROM` to a name on your verified domain
    (Resend cannot send as `@gmail.com`). Your Gmail goes in the signature via `OPP_CONTACT_EMAIL`, and
    `EMAIL_FORWARD_TO=kaash0542@gmail.com` copies every reply to Gmail too.
 5. Optional: `OPP_WATCHLIST=greenhouse:vercel,ashby:linear` to check dream companies' own job boards daily.
 
 **Sources (free, no key):** Himalayas (filtered to jobs open to `OPP_COUNTRY`), Remote OK, Remotive,
-Arbeitnow (remote only), Hacker News "Who is hiring" (often with a direct hiring email), and the
+Arbeitnow (remote only), Jobicy, We Work Remotely (RSS), Hacker News "Who is hiring" (often with a direct hiring email), and the
 Greenhouse / Lever / Ashby boards in your watchlist. Remote OK and Remotive require a link back and
 credit; the admin always shows the source and links to the listing. Remotive's feed is 24 h delayed.
 
 **Not automated, on purpose:** Upwork, LinkedIn and Fiverr have no public job API and forbid bots.
 Use **Add a job** to paste a post from there: you get a score and a proposal, then submit it on that
 site yourself.
+
+**Automation: two modes** (switch at the top of the Hunter page; **Pause** stops drafting and sending)
+
+| | Review first (default) | Auto send |
+|---|---|---|
+| Drafts | Top matches drafted automatically (`Drafts / day`, from `Draft from score`) | Same |
+| Sending | You review in **Ready to send**, tick several, **Send selected** — or open one and send | Drafts that pass every check go out, max one per hourly run, up to `Auto-sends / day` |
+| Apply-link jobs | Copy & open apply page | Same: forms on other sites are never auto-submitted |
+
+Auto send only sends a draft when **all** of these hold, otherwise it waits in *Ready to send*:
+AI score ≥ `Auto-send from score` (never below 60) · no warnings · open to your country · a hiring
+email **published in the post** (never a guessed address) whose domain accepts mail (MX check) · no
+contact with that company or address in 30 days · not do-not-contact · the draft passes the quality
+check (mentions the company, no `[placeholders]`, no AI boilerplate, sensible length) · under the
+daily caps. Each auto-send triggers a phone alert, and the **Run log** shows every step and error.
+
+**Board health:** the chips under the automation panel show each board's last result (green = OK,
+amber = failed 1–2 times, red = failing). One failing board never stops the run; every board is
+retried once per fetch, and a run only fails if all boards are down.
 
 **Daily routine**
 1. Open **Hunter → Matches** (sorted by match score; "Open to my country" hides location-locked posts).

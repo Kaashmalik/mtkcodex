@@ -60,9 +60,10 @@ export type HunterConfig = {
   projects: { slug: string; name: string }[];
 };
 
-type Tab = 'matches' | 'followups' | 'sent' | 'replied' | 'closed';
+type Tab = 'ready' | 'matches' | 'followups' | 'sent' | 'replied' | 'closed';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'ready', label: 'Ready to send' },
   { id: 'matches', label: 'Matches' },
   { id: 'followups', label: 'Follow-ups due' },
   { id: 'sent', label: 'Sent' },
@@ -76,6 +77,12 @@ const REPLIED: OpportunityStatus[] = ['replied', 'interview', 'won'];
 /** In the Matches list: still open, and a good enough score (jobs you added by hand always show). */
 const isMatch = (o: Opportunity, minScore: number) => OPEN.includes(o.status) && (o.source === 'manual' || effectiveScore(o) >= minScore);
 
+/** A drafted proposal waiting for your review. */
+const isReady = (o: Opportunity) => o.status === 'drafted' && Boolean(o.proposal);
+
+/** Can go out with "Send selected": has a draft and an address to send it to. */
+const batchSendable = (o: Opportunity) => isReady(o) && Boolean(o.apply_email || o.sent_to);
+
 const followupDue = (o: Opportunity, now: number) => o.status === 'sent' && Boolean(o.followup_at) && Date.parse(o.followup_at as string) <= now;
 
 const shortModel = (model: string) => model.split('/').pop() || model;
@@ -83,13 +90,14 @@ const shortModel = (model: string) => model.split('/').pop() || model;
 /** MTK Hunter: fresh remote jobs scored against your profile, with AI proposals you review and send. */
 export default function OpportunityBoard({ initial, automation, config }: { initial: Opportunity[]; automation: AutomationSnapshot; config: HunterConfig }) {
   const [items, setItems] = useState(initial);
-  const [tab, setTab] = useState<Tab>('matches');
+  const [tab, setTab] = useState<Tab>(() => (initial.some(isReady) ? 'ready' : 'matches'));
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('');
   const [openToMe, setOpenToMe] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [busy, setBusy] = useState<'' | 'refresh' | 'score'>('');
+  const [busy, setBusy] = useState<'' | 'refresh' | 'score' | 'batch'>('');
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
   const [sentToday, setSentToday] = useState(config.sentToday);
   const { toast, setToast, error, setError, fail } = useNotice();
   const [now] = useState(() => Date.now());
@@ -118,6 +126,7 @@ export default function OpportunityBoard({ initial, automation, config }: { init
     const q = query.trim().toLowerCase();
     return items
       .filter((o) => {
+        if (tab === 'ready' && !isReady(o)) return false;
         if (tab === 'matches' && !isMatch(o, config.minScore)) return false;
         if (tab === 'followups' && !followupDue(o, now)) return false;
         if (tab === 'sent' && o.status !== 'sent') return false;
@@ -129,7 +138,7 @@ export default function OpportunityBoard({ initial, automation, config }: { init
         return true;
       })
       .sort((a, b) =>
-        tab === 'matches'
+        tab === 'matches' || tab === 'ready'
           ? effectiveScore(b) - effectiveScore(a) || (b.posted_at || '').localeCompare(a.posted_at || '')
           : (b.sent_at || b.updated_at).localeCompare(a.sent_at || a.updated_at),
       )
@@ -138,12 +147,43 @@ export default function OpportunityBoard({ initial, automation, config }: { init
 
   const tabCount = (id: Tab) =>
     ({
+      ready: items.filter(isReady).length,
       matches: items.filter((o) => isMatch(o, config.minScore) && (!openToMe || o.location_ok)).length,
       followups: stats.due,
       sent: items.filter((o) => o.status === 'sent').length,
       replied: stats.replies,
       closed: items.filter((o) => ['skipped', 'lost'].includes(o.status)).length,
     })[id];
+
+  const toggleChecked = (id: string) =>
+    setChecked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const sendable = visible.filter(batchSendable);
+  const selectedIds = sendable.filter((o) => checked.has(o.id)).map((o) => o.id);
+
+  async function sendBatch() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Send ${selectedIds.length} reviewed proposal${selectedIds.length > 1 ? 's' : ''} by email now?`)) return;
+    setBusy('batch');
+    setError('');
+    try {
+      const { sent, failed } = await hunterApi.sendBatch(selectedIds);
+      setItems(await hunterApi.list());
+      setChecked(new Set());
+      setSentToday((n) => n + sent.length);
+      setToast(`Sent ${sent.length}${failed.length ? ` · ${failed.length} held back` : ''}. Replies land in the Inbox.`);
+      if (failed.length) setError(failed.map((f) => `${items.find((o) => o.id === f.id)?.company || f.id}: ${f.error}`).join(' · '));
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function refresh() {
     setBusy('refresh');
@@ -282,10 +322,45 @@ export default function OpportunityBoard({ initial, automation, config }: { init
         )}
       </div>
 
+      {tab === 'ready' && visible.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-muted/30 px-4 py-3 text-sm">
+          <label className="flex items-center gap-2 text-xs text-fg-muted">
+            <input
+              type="checkbox"
+              checked={sendable.length > 0 && selectedIds.length === sendable.length}
+              onChange={(e) => setChecked(e.target.checked ? new Set(sendable.map((o) => o.id)) : new Set())}
+              disabled={!sendable.length}
+            />
+            Select all with an email ({sendable.length})
+          </label>
+          <span className="text-xs text-fg-subtle">Drafts without an email: open them and use &quot;Copy &amp; open apply page&quot;.</span>
+          <button
+            className={`${primaryButtonClass} ml-auto`}
+            onClick={sendBatch}
+            disabled={!selectedIds.length || !config.email || busy !== '' || config.readOnly}
+          >
+            <Send className="size-4" /> {busy === 'batch' ? 'Sending…' : `Send selected (${selectedIds.length})`}
+          </button>
+        </div>
+      )}
+
       <ul className="mt-4 space-y-2">
         {visible.map((opp) => (
-          <li key={opp.id}>
-            <OpportunityRow opp={opp} signal={signals.get(opp.company_slug)} now={now} onOpen={() => setSelectedId(opp.id)} onSkip={() => setStatus(opp, 'skipped')} />
+          <li key={opp.id} className="flex items-start gap-2">
+            {tab === 'ready' && (
+              <input
+                type="checkbox"
+                className="mt-5 shrink-0"
+                checked={checked.has(opp.id)}
+                onChange={() => toggleChecked(opp.id)}
+                disabled={!batchSendable(opp)}
+                aria-label={`Select ${opp.title}`}
+                title={batchSendable(opp) ? 'Select for batch send' : 'No email: apply on their page'}
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <OpportunityRow opp={opp} signal={signals.get(opp.company_slug)} now={now} onOpen={() => setSelectedId(opp.id)} onSkip={() => setStatus(opp, 'skipped')} />
+            </div>
           </li>
         ))}
       </ul>

@@ -59,15 +59,16 @@ export async function clearRateLimit(key: string): Promise<void> {
 }
 
 /**
- * Best client IP. Provider headers come first because the edge sets them itself
- * (Netlify, Cloudflare); x-forwarded-for is the fallback (Vercel, plain proxies).
+ * Best client IP, read only from the header the current host sets itself, so a
+ * visitor can't dodge rate limits by sending a made-up header:
+ *   Netlify → x-nf-client-connection-ip · Vercel → x-real-ip / x-forwarded-for
+ *   Behind Cloudflare (TRUST_CLOUDFLARE=1) → cf-connecting-ip · otherwise the proxy's x-forwarded-for.
  */
-export function clientIp(req: Request): string {
-  return (
-    req.headers.get('x-nf-client-connection-ip') ||
-    req.headers.get('cf-connecting-ip') ||
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  );
+export function clientIp(req: Request, env: Record<string, string | undefined> = process.env): string {
+  const h = (name: string) => req.headers.get(name)?.trim() || '';
+  const forwarded = h('x-forwarded-for').split(',')[0]?.trim() || '';
+  if (env.NETLIFY) return h('x-nf-client-connection-ip') || forwarded || 'unknown';
+  if (env.VERCEL) return h('x-real-ip') || forwarded || 'unknown';
+  if (env.TRUST_CLOUDFLARE === '1') return h('cf-connecting-ip') || forwarded || 'unknown';
+  return forwarded || h('x-real-ip') || 'unknown';
 }
