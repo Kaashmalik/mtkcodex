@@ -116,6 +116,12 @@ export type Lead = {
   timezone?: string;
   preferred_channel?: PreferredChannel | string;
   contact_token?: string | null;
+  /** How this contact agreed to marketing messages (e.g. "Webinar sign-up form, 2026"). */
+  consent_source?: string;
+  consent_at?: string | null;
+  /** Channels they agreed to: 'sms', 'whatsapp'. */
+  consent_channels?: string[];
+  import_batch?: string;
   created_at: string;
   updated_at: string;
 };
@@ -238,6 +244,36 @@ export function normalizePhone(raw: string | null | undefined, defaultCountry = 
   else if (digits.length === 10 && digits.startsWith('3') && defaultCountry === '92') digits = `92${digits}`;
   if (digits.length < 8 || digits.length > 15) return '';
   return `+${digits}`;
+}
+
+/** Dialling prefixes for the markets we see most; longest match wins. */
+const PHONE_PREFIX_COUNTRY: [string, string][] = [
+  ['+971', 'AE'],
+  ['+966', 'SA'],
+  ['+974', 'QA'],
+  ['+968', 'OM'],
+  ['+965', 'KW'],
+  ['+973', 'BH'],
+  ['+92', 'PK'],
+  ['+91', 'IN'],
+  ['+44', 'GB'],
+  ['+49', 'DE'],
+  ['+33', 'FR'],
+  ['+61', 'AU'],
+  ['+1', 'US'],
+];
+
+/** ISO country of a lead: its saved location first, else its phone prefix. '' when unknown. */
+export function leadCountry(lead: Pick<Lead, 'country' | 'phone'>): string {
+  if (lead.country) return lead.country.toUpperCase();
+  const phone = lead.phone || '';
+  return PHONE_PREFIX_COUNTRY.find(([prefix]) => phone.startsWith(prefix))?.[1] || '';
+}
+
+/** Outside Pakistan (the home market). Unknown countries count as local. */
+export function isInternational(lead: Pick<Lead, 'country' | 'phone'>): boolean {
+  const country = leadCountry(lead);
+  return Boolean(country) && country !== 'PK';
 }
 
 /** Digits only, as WhatsApp uses for `wa_id`. */

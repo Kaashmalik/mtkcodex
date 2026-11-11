@@ -1,5 +1,5 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { cronAuthorised } from '@/lib/cron-auth';
 import type { HunterStep } from '@/lib/hunter-automation';
 import { hunterFailure } from '@/lib/hunter-http';
 import { runStep } from '@/lib/hunter-runner';
@@ -16,17 +16,8 @@ export const maxDuration = 26;
 
 const STEPS: HunterStep[] = ['refresh', 'score', 'draft', 'send', 'idle'];
 
-function authorised(req: Request): boolean {
-  const secret = (process.env.CRON_SECRET || '').trim();
-  if (secret.length < 16) return false;
-  const given = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const a = createHash('sha256').update(given).digest();
-  const b = createHash('sha256').update(secret).digest();
-  return timingSafeEqual(a, b);
-}
-
 export async function GET(req: Request) {
-  if (!authorised(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!cronAuthorised(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const done = (new URL(req.url).searchParams.get('done') || '')
     .split(',')
     .filter((s): s is HunterStep => STEPS.includes(s as HunterStep))

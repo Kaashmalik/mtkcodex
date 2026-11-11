@@ -9,6 +9,7 @@ third-party CRM or chat subscription.
 | `/admin/inbox` | One inbox for **website live chat, WhatsApp and email** — read and reply from anywhere |
 | `/admin/deals` | Kanban for work in progress (discovery → proposal → in progress → delivered) |
 | `/admin/outreach` | Click-to-send WhatsApp queue for cold outreach (from your own phone) |
+| `/admin/campaigns` | **Campaigns**: SMS / WhatsApp to consented contacts with tracked links. Guide: [`CAMPAIGNS.md`](./CAMPAIGNS.md) |
 | `/admin/opportunities` | **MTK Hunter**: fresh remote jobs scored against your projects, AI proposals you review and send |
 | `/admin/analytics` | Traffic, live visitor map with city/region/country, outreach numbers |
 | `/admin/settings` | Which channels are connected, phone/desktop alerts, webhook URLs |

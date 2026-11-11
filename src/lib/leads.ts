@@ -526,6 +526,15 @@ export function blankLead(input: Partial<Lead> & { name: string }, source: LeadS
     timezone: input.timezone || '',
     preferred_channel: input.preferred_channel || '',
     contact_token: input.contact_token ?? null,
+    // Only set when given, so databases without migration 0006 keep accepting inserts.
+    ...(input.consent_source
+      ? {
+          consent_source: input.consent_source,
+          consent_at: input.consent_at ?? now,
+          consent_channels: input.consent_channels || [],
+          import_batch: input.import_batch || '',
+        }
+      : {}),
     created_at: now,
     updated_at: now,
   };
@@ -621,6 +630,16 @@ export async function importLeads(rows: ImportedLead[], strategy: ImportStrategy
     if (row.tags?.length) changes.tags = Array.from(new Set([...(match.tags || []), ...row.tags])).slice(0, 12);
     if (row.status && match.status === 'new' && row.status !== 'new') changes.status = row.status;
     if (row.next_followup && !match.next_followup) changes.next_followup = row.next_followup;
+    // Consented contact imports refresh the consent record and fill in location.
+    if (row.consent_source) {
+      changes.consent_source = row.consent_source;
+      changes.consent_at = row.consent_at ?? new Date().toISOString();
+      changes.consent_channels = Array.from(new Set([...(match.consent_channels || []), ...(row.consent_channels || [])]));
+      changes.import_batch = row.import_batch || match.import_batch || '';
+      for (const field of ['city', 'region', 'country', 'timezone'] as const) {
+        if (row[field] && !match[field]) changes[field] = row[field];
+      }
+    }
 
     if (Object.keys(changes).length) updates.push({ id: match.id, changes });
     else result.skipped++;

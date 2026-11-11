@@ -3,6 +3,8 @@ import type { Conversation, Lead, LeadActivity, Message } from '@/lib/lead-types
 import type { ChannelStatus } from '@/lib/channels';
 import type { Opportunity, OpportunityStatus, Proposal, ProposalKind } from '@/lib/opportunity-types';
 import type { AutomationSettings, DailyCounters, HunterStep, RunEntry, SourceHealth } from '@/lib/hunter-automation';
+import type { Campaign, CampaignStats } from '@/lib/campaigns';
+import type { ConsentInfo, ContactMapping } from '@/lib/contact-import';
 
 /** Fetch wrapper for the admin API: JSON in/out, errors carry the server message. */
 async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -182,6 +184,21 @@ export const hunterApi = {
     api<{ opportunity: Opportunity }>('/api/admin/opportunities/send', { method: 'POST', body: JSON.stringify({ id, ...body }) }).then(
       (d) => d.opportunity,
     ),
+};
+
+export type CampaignRow = Campaign & { stats: CampaignStats };
+export type BatchRow = { batch: string; contacts: number; sms: number; whatsapp: number };
+export type CampaignRunReport = { campaign: string; sent: number; failed: number; skipped: number; waiting: number; queued: number; note?: string };
+
+export const campaignsApi = {
+  overview: () => api<{ campaigns: CampaignRow[]; batches: BatchRow[]; zones: Record<string, number> }>('/api/admin/campaigns'),
+  create: (input: Partial<Campaign>) =>
+    api<{ campaign: Campaign }>('/api/admin/campaigns', { method: 'POST', body: JSON.stringify(input) }).then((d) => d.campaign),
+  update: (id: string, input: Partial<Campaign> & { status?: Campaign['status'] }) =>
+    api<{ campaign: Campaign }>('/api/admin/campaigns', { method: 'PATCH', body: JSON.stringify({ id, ...input }) }).then((d) => d.campaign),
+  importRows: (rows: RawRow[], mapping: ContactMapping, consent: ConsentInfo & { confirmed: boolean }) =>
+    api<ImportSummary>('/api/admin/campaigns/import', { method: 'POST', body: JSON.stringify({ rows, mapping, consent }) }),
+  run: () => api<{ reports: CampaignRunReport[] }>('/api/admin/campaigns/run', { method: 'POST' }),
 };
 
 /** Downloads text as a file in the browser. */
