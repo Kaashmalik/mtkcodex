@@ -151,7 +151,9 @@ Every 15 minutes the sender:
    - **waits** if it's outside their local sending hours (time zone from their state; if the state is
      unknown, it only sends when it's daytime in every mainland zone);
    - otherwise **sends**, records it on their timeline and marks the lead *contacted*;
-3. stops at the campaign's daily limit, or after ~18 seconds, and continues next run;
+3. **paces itself**: each run sends at most about 1.5 × (daily limit ÷ number of 15-minute runs in
+   the sending hours), so 200/day over 9:00–20:00 goes out ~7 every 15 minutes, never in one burst;
+   it also stops at the daily limit, or after ~18 seconds, and continues next run;
 4. pauses a campaign's run after 5 failures in a row with no success (a provider problem), and
    marks a campaign **done** when everyone has been messaged.
 

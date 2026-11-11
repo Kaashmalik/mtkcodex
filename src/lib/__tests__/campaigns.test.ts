@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { renderSms, smsSegments } from '@/lib/campaign-message';
-import { computeStats, inAudience, startOfUsDay, validateCampaign, type Campaign, type Recipient } from '@/lib/campaigns';
+import { computeStats, inAudience, perRunLimit, startOfUsDay, validateCampaign, type Campaign, type Recipient } from '@/lib/campaigns';
 import { autoMapContacts, parseContactFile, rowToContact, validateConsent, type ConsentInfo } from '@/lib/contact-import';
 import { blankLead } from '@/lib/leads';
 import { isInternational, leadCountry, type Lead } from '@/lib/lead-types';
@@ -139,6 +139,12 @@ describe('audience', () => {
     });
     const stats = computeStats([rec({ status: 'delivered', clicked_at: '2026-11-11T17:05:00Z' }), rec({ lead_id: 'x', status: 'queued', sent_at: null })], new Map([['l1', lead]]), 2, new Date('2026-11-11T20:00:00Z'));
     expect(stats).toMatchObject({ audience: 2, sent: 1, delivered: 1, queued: 1, clicked: 1, replied: 1, sentToday: 1 });
+  });
+
+  it('spreads the daily limit across the sending hours', () => {
+    expect(perRunLimit({ daily_limit: 200, window_start: 9, window_end: 20 })).toBe(7); // 44 runs → ~5, ×1.5
+    expect(perRunLimit({ daily_limit: 50, window_start: 10, window_end: 17 })).toBe(3);
+    expect(perRunLimit({ daily_limit: 1, window_start: 9, window_end: 20 })).toBe(1);
   });
 
   it('starts the daily count at midnight US Eastern', () => {

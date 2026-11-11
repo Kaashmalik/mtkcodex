@@ -95,6 +95,17 @@ export function inAudience(lead: Lead, campaign: Pick<Campaign, 'channel' | 'aud
   return true;
 }
 
+/**
+ * Messages per 15-minute run, so the daily limit is spread evenly across the
+ * sending hours instead of going out in one burst. Contacts in later time
+ * zones open their window later, so a little headroom (×1.5) lets the day
+ * still reach the limit.
+ */
+export function perRunLimit(campaign: Pick<Campaign, 'daily_limit' | 'window_start' | 'window_end'>): number {
+  const runs = Math.max(1, (campaign.window_end - campaign.window_start) * 4);
+  return Math.max(1, Math.ceil((campaign.daily_limit / runs) * 1.5));
+}
+
 /** Start of "today" in US Eastern time, for daily limits that match the recipients' day. */
 export function startOfUsDay(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
@@ -390,10 +401,15 @@ export async function runCampaigns(budgetMs = 18_000, now = new Date()): Promise
     let sentToday = recipients.filter((r) => r.sent_at && r.sent_at >= since).length;
     const report: RunReport = { campaign: campaign.name, sent: 0, failed: 0, skipped: 0, waiting: 0, queued: 0 };
     const queue = recipients.filter((r) => r.status === 'queued');
+    const perRun = perRunLimit(campaign);
 
     for (const recipient of queue) {
       if (sentToday >= campaign.daily_limit) {
         report.note = `Daily limit ${campaign.daily_limit} reached`;
+        break;
+      }
+      if (report.sent >= perRun) {
+        report.note = `Paced: ${perRun} per 15 minutes`;
         break;
       }
       if (Date.now() - started > budgetMs) {
