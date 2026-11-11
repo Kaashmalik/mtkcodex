@@ -323,7 +323,11 @@ strip on `/admin` lists who is on the site right now.
 ## 8b. MTK Hunter — remote jobs & AI proposals (`/admin/opportunities`)
 
 Finds fresh remote jobs and client posts, scores them against your real projects, writes a
-tailored proposal, and sends it after you review it. Nothing is ever sent without your click.
+tailored proposal, and sends it after your review (or automatically in auto mode, when every
+safety check passes).
+
+> **Full guide:** [`HUNTER.md`](./HUNTER.md) covers setup, choosing models, costs, both modes, every
+> setting and troubleshooting. This section is the short version.
 
 **Flow:** fetch → keyword match → dedupe → AI score → AI draft → **you review** → send email or apply on their page → replies land in the Inbox → follow-ups → deal.
 
@@ -377,7 +381,8 @@ retried once per fetch, and a run only fails if all boards are down.
 do-not-contact leads, job posts treated as untrusted text, and links in drafts limited to your own
 site, products, GitHub, LinkedIn and booking page. Prefer posts that invite applications by email.
 
-**Cost:** scoring 500 jobs/day with DeepSeek V4.1 Flash is cents; a Kimi K3.1 Pro proposal is about a cent.
+**Cost:** scoring 500 jobs/day with DeepSeek V4.1 Flash is about $0.10; a Kimi K3.1 Pro proposal is
+about 1–2 cents. Roughly $5–9 a month with the defaults (see `HUNTER.md` → AI models).
 
 ---
 

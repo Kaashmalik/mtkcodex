@@ -106,6 +106,7 @@ locations, local times and phone alerts. It installs on a phone as an app.
 | `/locations` | Location pages incl. Lahore, with keyless maps embeds |
 | `/admin` | Lead CRM: pipeline, filters, notes, follow-ups, CSV export (owner-only) |
 | `/admin/outreach` | WhatsApp send queue with pre-written, personalised openers |
+| `/admin/opportunities` | **MTK Hunter**: fresh remote jobs scored against your projects, AI proposals you review or auto-send. Guide: [`docs/HUNTER.md`](./docs/HUNTER.md) |
 | `/admin/docs` | In-app playbook; full version in [`docs/CRM.md`](./docs/CRM.md) |
 
 ## 📁 Project Structure
@@ -113,7 +114,7 @@ locations, local times and phone alerts. It installs on a phone as an app.
 ```
 mtkcodex/
 ├── content/blog/           # Markdown blog posts
-├── docs/                   # CRM runbook + outreach batch records
+├── docs/                   # CRM runbook (CRM.md) + MTK Hunter guide (HUNTER.md)
 ├── public/                 # Static assets (icons, favicon)
 ├── supabase/migrations/    # Lead CRM table + RLS migration
 ├── scripts/                # Batch doc generator
