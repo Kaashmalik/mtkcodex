@@ -1,6 +1,7 @@
 import type { ColumnMapping, RawRow } from '@/lib/lead-import';
 import type { Conversation, Lead, LeadActivity, Message } from '@/lib/lead-types';
 import type { ChannelStatus } from '@/lib/channels';
+import type { Opportunity, OpportunityStatus, Proposal, ProposalKind } from '@/lib/opportunity-types';
 
 /** Fetch wrapper for the admin API: JSON in/out, errors carry the server message. */
 async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -115,6 +116,52 @@ export const pushApi = {
   unsubscribe: (endpoint: string) =>
     api<{ ok: boolean }>('/api/admin/push', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   test: () => api<{ push: number; telegram: boolean }>('/api/admin/push/test', { method: 'POST' }),
+};
+
+export type HunterRefresh = {
+  fetched: number;
+  fresh: number;
+  inserted: number;
+  seenAgain: number;
+  expired: number;
+  sources: { source: string; fetched: number; error?: string }[];
+};
+
+export type ProposalRequest = {
+  kind?: ProposalKind;
+  tone?: 'warm' | 'direct' | 'formal';
+  length?: 'short' | 'medium';
+  instructions?: string;
+};
+
+export type SendProposalBody = {
+  via: 'email' | 'apply_link';
+  to?: string;
+  subject: string;
+  body: string;
+  cover?: string;
+  kind?: ProposalKind;
+};
+
+export const hunterApi = {
+  list: () => api<{ opportunities: Opportunity[] }>('/api/admin/opportunities').then((d) => d.opportunities),
+  add: (job: { title: string; company?: string; url?: string; apply_email?: string; description: string }) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities', { method: 'POST', body: JSON.stringify(job) }).then((d) => d.opportunity),
+  patch: (id: string, patch: { status?: OpportunityStatus; notes?: string; apply_email?: string; proposal?: Partial<Proposal> }) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities', { method: 'PATCH', body: JSON.stringify({ id, ...patch }) }).then(
+      (d) => d.opportunity,
+    ),
+  refresh: () => api<HunterRefresh>('/api/admin/opportunities/refresh', { method: 'POST' }),
+  score: () => api<{ scored: number; remaining: number }>('/api/admin/opportunities/score', { method: 'POST' }),
+  propose: (id: string, request: ProposalRequest = {}) =>
+    api<{ proposal: Proposal; opportunity: Opportunity }>('/api/admin/opportunities/proposal', {
+      method: 'POST',
+      body: JSON.stringify({ id, ...request }),
+    }),
+  send: (id: string, body: SendProposalBody) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities/send', { method: 'POST', body: JSON.stringify({ id, ...body }) }).then(
+      (d) => d.opportunity,
+    ),
 };
 
 /** Downloads text as a file in the browser. */

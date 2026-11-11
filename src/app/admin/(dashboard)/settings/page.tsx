@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import SettingsPanel, { type ChannelRow } from '@/components/admin/SettingsPanel';
 import { channelStatus } from '@/lib/channels';
+import { llmConfigured } from '@/lib/llm';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -24,6 +25,8 @@ export default function SettingsPage() {
     { name: 'WhatsApp Cloud API', on: status.whatsapp, what: 'Two-way WhatsApp from the inbox (Meta).', missing: missing('WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN') },
     { name: 'Push alerts', on: status.push, what: 'Notifications on your phone/laptop via the installed app.', missing: missing('VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT') },
     { name: 'Telegram alerts', on: status.telegram, what: 'Optional backup alerts to your Telegram.', missing: missing('TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID') },
+    { name: 'MTK Hunter — AI', on: llmConfigured(), what: 'Scores remote jobs and writes proposals (River: DeepSeek for scoring, Kimi for writing).', missing: missing('LLM_API_KEY') },
+    { name: 'MTK Hunter — daily fetch', on: Boolean((process.env.CRON_SECRET || '').trim()), what: 'Pulls fresh jobs every morning at 08:00 PKT and scores them.', missing: missing('CRON_SECRET') },
     { name: 'Book-a-call link', on: status.booking, what: 'Cal.com / Google Calendar booking link shown in chat and on the contact page.', missing: missing('NEXT_PUBLIC_BOOKING_URL') },
   ];
 

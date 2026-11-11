@@ -40,6 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/inbox', label: 'Inbox', badge: unread },
     { href: '/admin/deals', label: 'Deals' },
     { href: '/admin/outreach', label: 'Outreach' },
+    { href: '/admin/opportunities', label: 'Hunter' },
     { href: '/admin/analytics', label: 'Analytics' },
     { href: '/admin/docs', label: 'Playbook' },
     { href: '/admin/settings', label: 'Settings' },

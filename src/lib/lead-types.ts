@@ -64,7 +64,7 @@ export const DEAL_STAGE_LABELS: Record<DealStage, string> = {
 /** Stages where the client has committed, so the lead counts as won. */
 export const WON_DEAL_STAGES: DealStage[] = ['in_progress', 'review', 'delivered'];
 
-export type LeadSource = 'scraper' | 'import' | 'manual' | 'website' | 'whatsapp' | 'web_chat' | 'email';
+export type LeadSource = 'scraper' | 'import' | 'manual' | 'website' | 'whatsapp' | 'web_chat' | 'email' | 'opportunity';
 
 /** How a client prefers to be contacted (set on the contact form or in the chat). */
 export type PreferredChannel = '' | 'email' | 'whatsapp' | 'call' | 'chat';

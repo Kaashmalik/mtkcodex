@@ -9,6 +9,7 @@ third-party CRM or chat subscription.
 | `/admin/inbox` | One inbox for **website live chat, WhatsApp and email** — read and reply from anywhere |
 | `/admin/deals` | Kanban for work in progress (discovery → proposal → in progress → delivered) |
 | `/admin/outreach` | Click-to-send WhatsApp queue for cold outreach (from your own phone) |
+| `/admin/opportunities` | **MTK Hunter**: fresh remote jobs scored against your projects, AI proposals you review and send |
 | `/admin/analytics` | Traffic, live visitor map with city/region/country, outreach numbers |
 | `/admin/settings` | Which channels are connected, phone/desktop alerts, webhook URLs |
 | `/admin/docs` | Short in-app playbook |
@@ -316,6 +317,46 @@ strip on `/admin` lists who is on the site right now.
   cookies or storage. Do Not Track, Global Privacy Control and an "analytics off" choice are honoured.
 - Only real public pages are recorded; bots, `/admin` and `/api` are ignored.
 - Retention: run `select public.analytics_prune(180);` monthly.
+
+---
+
+## 8b. MTK Hunter — remote jobs & AI proposals (`/admin/opportunities`)
+
+Finds fresh remote jobs and client posts, scores them against your real projects, writes a
+tailored proposal, and sends it after you review it. Nothing is ever sent without your click.
+
+**Flow:** fetch → keyword match → dedupe → AI score → AI draft → **you review** → send email or apply on their page → replies land in the Inbox → follow-ups → deal.
+
+**Setup (10 minutes)**
+1. Run `supabase/migrations/0005_opportunities.sql` in the Supabase SQL editor.
+2. Create a River key at https://console.river.ai/keys and set `LLM_API_KEY` (base URL and models default to River + DeepSeek/Kimi).
+3. Set `CRON_SECRET` (`openssl rand -hex 32`). Netlify runs `netlify/functions/hunter-daily.mjs` at 08:00 PKT.
+4. Email: proposals use Resend like the Inbox. Set `OPP_EMAIL_FROM` to a name on your verified domain
+   (Resend cannot send as `@gmail.com`). Your Gmail goes in the signature via `OPP_CONTACT_EMAIL`, and
+   `EMAIL_FORWARD_TO=kaash0542@gmail.com` copies every reply to Gmail too.
+5. Optional: `OPP_WATCHLIST=greenhouse:vercel,ashby:linear` to check dream companies' own job boards daily.
+
+**Sources (free, no key):** Himalayas (filtered to jobs open to `OPP_COUNTRY`), Remote OK, Remotive,
+Arbeitnow (remote only), Hacker News "Who is hiring" (often with a direct hiring email), and the
+Greenhouse / Lever / Ashby boards in your watchlist. Remote OK and Remotive require a link back and
+credit; the admin always shows the source and links to the listing. Remotive's feed is 24 h delayed.
+
+**Not automated, on purpose:** Upwork, LinkedIn and Fiverr have no public job API and forbid bots.
+Use **Add a job** to paste a post from there: you get a score and a proposal, then submit it on that
+site yourself.
+
+**Daily routine**
+1. Open **Hunter → Matches** (sorted by match score; "Open to my country" hides location-locked posts).
+2. Open a job → read the fit reason and company signals (open roles, new roles in 14 days).
+3. **Write proposal with AI** → edit → **Send email** (direct email) or **Copy & open apply page**.
+4. **Follow-ups due** shows email proposals with no reply after 4 days (then 6 more, max 2).
+5. Replies arrive in the Inbox; the opportunity flips to *Replied* by itself. Mark *Interview / Won / Lost*.
+
+**Safety & deliverability:** a daily cap (`OPP_DAILY_SEND_LIMIT`, default 20), no sending to
+do-not-contact leads, job posts treated as untrusted text, and links in drafts limited to your own
+site, products, GitHub, LinkedIn and booking page. Prefer posts that invite applications by email.
+
+**Cost:** scoring 500 jobs/day with DeepSeek V4.1 Flash is cents; a Kimi K3.1 Pro proposal is about a cent.
 
 ---
 
