@@ -19,7 +19,7 @@ opt-outs flow back into the CRM.
 5. [How sending works](#5-how-sending-works)
 6. [Links, clicks, replies and opt-outs](#6-links-clicks-replies-and-opt-outs)
 7. [Pakistan vs international leads](#7-pakistan-vs-international-leads)
-8. [Costs](#8-costs)
+8. [Costs, free credits and the recommended plan](#8-costs)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Compliance checklist](#10-compliance-checklist)
 11. [For developers](#11-for-developers)
@@ -230,6 +230,35 @@ Approximate; check current pricing with Twilio and Meta.
 | Netlify, Supabase, tracking | Free tier |
 
 Example: 3,000 one-segment SMS ≈ $35–40 in messaging fees.
+
+### Free credits and the cheapest way to send
+
+There is **no legitimate way to send marketing SMS to US numbers for free every day**. Every route
+goes through a carrier, and US carriers bill per message. What you *can* get free or cheap:
+
+| Option | What you get | Good for |
+|---|---|---|
+| **GitHub Student Developer Pack → Twilio** | Twilio is a pack partner; in 2022 the offer was **up to $100 Twilio credit** for new accounts. Check the current amount at [education.github.com/pack/offers](https://education.github.com/pack/offers) and sign up **through the pack link** before making a normal Twilio account | **Best option.** $100 ≈ 7,000–8,000 one-segment US SMS: 3,000 contacts about twice. 10DLC registration fees are generally charged to your Twilio balance; confirm in the Twilio Console |
+| **Twilio free trial** | ~$15 credit, but texts only go to up to 5 numbers you verify yourself, and every message starts with "Sent from a Twilio trial account" | Testing the whole setup on your own phone, not real campaigns |
+| **WhatsApp Cloud API** | Marketing templates are **always paid** (~$0.025 per message to the US); no free daily allowance for them. Replies within 24 hours to a customer who messaged you first have historically been free; check Meta's current rate card | Cheap follow-ups once people write to you |
+| **"Message us" buttons** | Free. Put a WhatsApp chat link and a "Text us" link on your landing page (and in Hunter proposals) so interested people start the conversation | Turning link clicks into free conversations |
+| **Email** | Resend free plan: 100 a day, 3,000 a month | Contacts with emails (future imports that include them) |
+
+**Avoid** "free SMS gateway" websites, phone-SIM bulk-SMS apps and email-to-text tricks. US
+carriers block that traffic, it breaks their terms, and numbers get banned fast.
+
+### Recommended plan
+
+1. **Claim the GitHub Student Pack Twilio offer** (new Twilio account through the pack link).
+2. **Register A2P 10DLC** in Twilio (brand + *Marketing* campaign). Allow a few days for approval.
+3. **Test on the free trial / your own phone first**: send a campaign to a one-contact batch, check
+   the link click, a reply, and STOP.
+4. **Send to your 3,000 contacts at 100–200 a day** with sending hours **10–17** (prime reading
+   time; see *Best time to send*). The sender paces itself, about 4–7 messages every 15 minutes.
+5. **Use WhatsApp only for contacts who replied or opted in to WhatsApp**, and answer replies
+   within 24 hours.
+6. **Watch the numbers** on each campaign card (delivered, clicked, replied, opted out). If opt-outs
+   go above ~2% or replies are rare, pause, rewrite the message, and try a smaller batch.
 
 ---
 
