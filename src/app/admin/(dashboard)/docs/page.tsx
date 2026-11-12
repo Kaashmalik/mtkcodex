@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Database, MessageSquare, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, BookOpen, Database, MessageSquare, ShieldCheck, Target } from 'lucide-react';
 
 export const metadata = {
   title: 'Outreach playbook',
@@ -41,6 +41,33 @@ export default function AdminDocsPage() {
           <li>Change the password in Vercel → Settings → Environment Variables, then redeploy.</li>
           <li>Never commit credentials. <code>.env.local</code> is gitignored.</li>
           <li><code>/admin</code> is excluded from search engines and the sitemap.</li>
+        </ul>
+      </Section>
+
+      <Section icon={Target} title="MTK Hunter (remote jobs & proposals)">
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            <Link href="/admin/opportunities" className="text-brand hover:underline">Hunter</Link> runs every hour: it fetches
+            fresh jobs from 8 boards, scores them with <code>DeepSeek-V4.1-Flash</code> and drafts proposals for your top
+            matches with <code>Kimi-K3.1-Pro</code> (River, key in <code>LLM_API_KEY</code>).
+          </li>
+          <li>
+            <strong>Review first</strong> (default): open <em>Ready to send</em>, edit, then <em>Send email</em>,{' '}
+            <em>Copy &amp; open apply page</em>, or tick several and <em>Send selected</em>.
+          </li>
+          <li>
+            <strong>Auto send</strong>: drafts go out on their own only if the score is high, there are no warnings, the
+            hiring email came from the post, and the company hasn&apos;t been contacted in 30 days. One per hour at most,
+            with a daily cap. <em>Pause</em> stops it at once.
+          </li>
+          <li>
+            Slow or failing drafts: set <code>LLM_REASONING=none</code> or <code>LLM_MODEL_WRITER=zai-org/GLM-5.3-Flash</code>.
+            About $5–9 a month with the defaults.
+          </li>
+          <li>
+            Full guide: <code className="rounded bg-muted px-1">docs/HUNTER.md</code> (setup, models, costs, every setting,
+            troubleshooting).
+          </li>
         </ul>
       </Section>
 

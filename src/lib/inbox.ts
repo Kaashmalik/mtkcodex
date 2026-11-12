@@ -324,14 +324,19 @@ export type SendInput = {
   text?: string;
   subject?: string;
   template?: { name: string; language: string; params?: string[] };
+  /** Feature that sent it (e.g. "hunter"), kept on the timeline entry. */
+  source?: string;
+  /** Email only: sender override, e.g. a personal name on the verified domain. */
+  from?: string;
 };
 
-async function recordOutbound(lead: Lead | null, message: NewMessage, summary: string, channel: string) {
+async function recordOutbound(lead: Lead | null, message: NewMessage, summary: string, channel: string, source?: string) {
   const stored = await insertMessage(message);
   if (!lead) return stored;
   const now = new Date().toISOString();
   const changes: Partial<Lead> = { last_outbound_at: now, last_contacted: todayPKT(), unread_count: 0 };
-  const activities: NewActivity[] = [{ lead_id: lead.id, kind: 'message_out', summary: summary.slice(0, 200), meta: { channel } }];
+  const meta = source ? { channel, source } : { channel };
+  const activities: NewActivity[] = [{ lead_id: lead.id, kind: 'message_out', summary: summary.slice(0, 200), meta }];
   if (!CONTACTED_STATUSES.includes(lead.status)) {
     changes.status = 'contacted';
     activities.push({
@@ -401,6 +406,7 @@ export async function sendFromDashboard(input: SendInput): Promise<Message> {
     const token = lead ? await ensureContactToken(lead) : null;
     const { id } = await sendEmail({
       to: address,
+      from: input.from,
       subject,
       text,
       replyTo: replyAddress(token),
@@ -411,6 +417,7 @@ export async function sendFromDashboard(input: SendInput): Promise<Message> {
       { lead_id: lead?.id ?? null, channel: 'email', thread_key: input.key, direction: 'out', sender: 'agent', msg_type: 'email', subject, body: text, external_id: `email:${id}`, status: 'sent' },
       `Email: ${subject}`,
       'email',
+      input.source,
     );
     return stored ?? fallbackMessage(lead?.id ?? null, 'email', input.key, text);
   }

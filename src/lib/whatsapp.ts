@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * WhatsApp Business Cloud API (Meta). Optional: the inbox turns on when these
@@ -19,6 +19,14 @@ export function whatsappConfigured(): boolean {
 
 export function whatsappVerifyToken(): string {
   return env('WHATSAPP_VERIFY_TOKEN');
+}
+
+/** Meta's subscription handshake token, compared in constant time. */
+export function verifyTokenMatches(given: string | null, expected = whatsappVerifyToken()): boolean {
+  if (!expected || !given) return false;
+  const a = createHash('sha256').update(given).digest();
+  const b = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(a, b);
 }
 
 /** Checks Meta's `X-Hub-Signature-256: sha256=<hex>` header against the raw body. */

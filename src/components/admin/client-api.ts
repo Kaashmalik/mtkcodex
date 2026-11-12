@@ -1,6 +1,10 @@
 import type { ColumnMapping, RawRow } from '@/lib/lead-import';
 import type { Conversation, Lead, LeadActivity, Message } from '@/lib/lead-types';
 import type { ChannelStatus } from '@/lib/channels';
+import type { Opportunity, OpportunityStatus, Proposal, ProposalKind } from '@/lib/opportunity-types';
+import type { AutomationSettings, DailyCounters, HunterStep, RunEntry, SourceHealth } from '@/lib/hunter-automation';
+import type { Campaign, CampaignStats } from '@/lib/campaigns';
+import type { ConsentInfo, ContactMapping } from '@/lib/contact-import';
 
 /** Fetch wrapper for the admin API: JSON in/out, errors carry the server message. */
 async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -115,6 +119,86 @@ export const pushApi = {
   unsubscribe: (endpoint: string) =>
     api<{ ok: boolean }>('/api/admin/push', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
   test: () => api<{ push: number; telegram: boolean }>('/api/admin/push/test', { method: 'POST' }),
+};
+
+export type HunterRefresh = {
+  fetched: number;
+  fresh: number;
+  inserted: number;
+  seenAgain: number;
+  expired: number;
+  sources: { source: string; fetched: number; error?: string }[];
+};
+
+export type ProposalRequest = {
+  kind?: ProposalKind;
+  tone?: 'warm' | 'direct' | 'formal';
+  length?: 'short' | 'medium';
+  instructions?: string;
+};
+
+export type SendProposalBody = {
+  via: 'email' | 'apply_link';
+  to?: string;
+  subject: string;
+  body: string;
+  cover?: string;
+  kind?: ProposalKind;
+};
+
+export type AutomationSnapshot = {
+  settings: AutomationSettings;
+  daily: DailyCounters;
+  runs: RunEntry[];
+  health: Record<string, SourceHealth>;
+  lastRefreshAt: string | null;
+  queues: { draft: number; auto: number };
+};
+
+export const hunterApi = {
+  list: () => api<{ opportunities: Opportunity[] }>('/api/admin/opportunities').then((d) => d.opportunities),
+  add: (job: { title: string; company?: string; url?: string; apply_email?: string; description: string }) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities', { method: 'POST', body: JSON.stringify(job) }).then((d) => d.opportunity),
+  patch: (id: string, patch: { status?: OpportunityStatus; notes?: string; apply_email?: string; proposal?: Partial<Proposal> }) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities', { method: 'PATCH', body: JSON.stringify({ id, ...patch }) }).then(
+      (d) => d.opportunity,
+    ),
+  refresh: () => api<HunterRefresh>('/api/admin/opportunities/refresh', { method: 'POST' }),
+  score: () => api<{ scored: number; remaining: number }>('/api/admin/opportunities/score', { method: 'POST' }),
+  propose: (id: string, request: ProposalRequest = {}) =>
+    api<{ proposal: Proposal; opportunity: Opportunity }>('/api/admin/opportunities/proposal', {
+      method: 'POST',
+      body: JSON.stringify({ id, ...request }),
+    }),
+  automation: () => api<AutomationSnapshot>('/api/admin/opportunities/automation'),
+  saveAutomation: (settings: Partial<AutomationSettings>) =>
+    api<AutomationSnapshot>('/api/admin/opportunities/automation', { method: 'PUT', body: JSON.stringify(settings) }),
+  runStep: (done: HunterStep[]) =>
+    api<{ step: HunterStep; summary: string; error?: string }>('/api/admin/opportunities/run', { method: 'POST', body: JSON.stringify({ done }) }),
+  sendBatch: (ids: string[]) =>
+    api<{ sent: string[]; failed: { id: string; error: string }[] }>('/api/admin/opportunities/send-batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+  send: (id: string, body: SendProposalBody) =>
+    api<{ opportunity: Opportunity }>('/api/admin/opportunities/send', { method: 'POST', body: JSON.stringify({ id, ...body }) }).then(
+      (d) => d.opportunity,
+    ),
+};
+
+export type CampaignRow = Campaign & { stats: CampaignStats };
+export type BatchRow = { batch: string; contacts: number; sms: number; whatsapp: number };
+export type CampaignRunReport = { campaign: string; sent: number; failed: number; skipped: number; waiting: number; queued: number; note?: string };
+
+export const campaignsApi = {
+  overview: () => api<{ campaigns: CampaignRow[]; batches: BatchRow[]; zones: Record<string, number> }>('/api/admin/campaigns'),
+  create: (input: Partial<Campaign>) =>
+    api<{ campaign: Campaign }>('/api/admin/campaigns', { method: 'POST', body: JSON.stringify(input) }).then((d) => d.campaign),
+  update: (id: string, input: Partial<Campaign> & { status?: Campaign['status'] }) =>
+    api<{ campaign: Campaign }>('/api/admin/campaigns', { method: 'PATCH', body: JSON.stringify({ id, ...input }) }).then((d) => d.campaign),
+  importRows: (rows: RawRow[], mapping: ContactMapping, consent: ConsentInfo & { confirmed: boolean }) =>
+    api<ImportSummary>('/api/admin/campaigns/import', { method: 'POST', body: JSON.stringify({ rows, mapping, consent }) }),
+  run: () => api<{ reports: CampaignRunReport[] }>('/api/admin/campaigns/run', { method: 'POST' }),
 };
 
 /** Downloads text as a file in the browser. */

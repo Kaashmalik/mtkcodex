@@ -25,9 +25,12 @@ import {
   STATUS_LABELS,
   addDaysPKT,
   canMessage,
+  countryName,
   dealTone,
   flagEmoji,
   formatMoney,
+  isInternational,
+  leadCountry,
   leadStats,
   leadsToCsv,
   phoneDigits,
@@ -45,6 +48,8 @@ import AddLeadDialog from '@/components/admin/AddLeadDialog';
 import TodayPanel, { type ActivityPoint, type FeedItem } from '@/components/admin/TodayPanel';
 import { downloadText, leadsApi, type LeadPatchBody } from '@/components/admin/client-api';
 import { ErrorBanner, Notice, StatCard, Toast, buttonClass, primaryButtonClass, useNotice } from '@/components/admin/ui';
+import SendTimeAdvisor from '@/components/admin/SendTimeAdvisor';
+import { zoneFor } from '@/lib/send-times';
 import type { AnalyticsSummary } from '@/lib/analytics-types';
 import type { StorageMode } from '@/lib/leads';
 
@@ -77,6 +82,8 @@ export default function Dashboard({
   const [status, setStatus] = useState<'all' | LeadStatus>('all');
   const [tier, setTier] = useState('all');
   const [source, setSource] = useState('all');
+  const [market, setMarket] = useState<'all' | 'local' | 'international'>('all');
+  const [country, setCountry] = useState('all');
   const [quick, setQuick] = useState<Set<Quick>>(new Set());
   const [hideOptOut, setHideOptOut] = useState(false);
   const [sort, setSort] = useState<Sort>('newest');
@@ -103,12 +110,41 @@ export default function Dashboard({
   const tiers = useMemo(() => [...new Set(leads.map((l) => l.lead_tier).filter(Boolean))].sort(), [leads]);
   const sources = useMemo(() => [...new Set(leads.map((l) => l.source || 'scraper'))].sort(), [leads]);
 
+  /** Pakistan vs international split, plus a count per foreign country. */
+  const markets = useMemo(() => {
+    const countries = new Map<string, number>();
+    let international = 0;
+    for (const lead of leads) {
+      if (!isInternational(lead)) continue;
+      international += 1;
+      const code = leadCountry(lead);
+      countries.set(code, (countries.get(code) || 0) + 1);
+    }
+    return { local: leads.length - international, international, countries: [...countries.entries()].sort((a, b) => b[1] - a[1]) };
+  }, [leads]);
+
+  /** Time zones of the international leads in view, for the best-time advisor. */
+  const intlZones = useMemo(() => {
+    const zones: Record<string, number> = {};
+    if (market !== 'international') return zones;
+    for (const lead of leads) {
+      if (!isInternational(lead) || lead.do_not_contact) continue;
+      if (country !== 'all' && leadCountry(lead) !== country) continue;
+      const zone = zoneFor(lead, leadCountry(lead));
+      if (zone) zones[zone] = (zones[zone] || 0) + 1;
+    }
+    return zones;
+  }, [leads, market, country]);
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const rows = leads.filter((lead) => {
       if (status !== 'all' && lead.status !== status) return false;
       if (tier !== 'all' && lead.lead_tier !== tier) return false;
       if (source !== 'all' && (lead.source || 'scraper') !== source) return false;
+      if (market === 'local' && isInternational(lead)) return false;
+      if (market === 'international' && !isInternational(lead)) return false;
+      if (market === 'international' && country !== 'all' && leadCountry(lead) !== country) return false;
       if (hideOptOut && lead.do_not_contact) return false;
       if (quick.has('starred') && !lead.starred) return false;
       if (quick.has('unread') && !(lead.unread_count || 0)) return false;
@@ -130,7 +166,7 @@ export default function Dashboard({
       reply: (a, b) => (b.last_inbound_at || '').localeCompare(a.last_inbound_at || ''),
     };
     return rows.sort(by[sort]);
-  }, [leads, query, status, tier, source, quick, hideOptOut, sort, today]);
+  }, [leads, query, status, tier, source, market, country, quick, hideOptOut, sort, today]);
 
   const shown = filtered.slice(0, visible);
   const allShownChecked = shown.length > 0 && shown.every((lead) => checked.has(lead.id));
@@ -308,6 +344,44 @@ export default function Dashboard({
       <TodayPanel leads={leads} points={points} feed={feed} onOpen={setSelectedId} />
 
       <div className="mt-8 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-full border border-line p-1" role="radiogroup" aria-label="Market">
+          {(
+            [
+              ['all', `All (${leads.length})`],
+              ['local', `🇵🇰 Pakistan (${markets.local})`],
+              ['international', `🌍 International (${markets.international})`],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="radio"
+              aria-checked={market === value}
+              onClick={() => {
+                setMarket(value);
+                setCountry('all');
+                setVisible(PAGE);
+              }}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${market === value ? 'bg-brand text-white' : 'text-fg-muted hover:text-fg'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {market === 'international' && markets.countries.length > 1 && (
+          <Select value={country} onChange={setCountry} label="Country">
+            <option value="all">All countries</option>
+            {markets.countries.map(([code, count]) => (
+              <option key={code} value={code}>
+                {flagEmoji(code)} {countryName(code)} ({count})
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
+
+      {market === 'international' && <SendTimeAdvisor zoneCounts={intlZones} title="Best time to contact these leads (Pakistan time)" />}
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
           <input
@@ -480,7 +554,11 @@ export default function Dashboard({
                         {lead.do_not_contact && <Ban className="size-3.5 shrink-0 text-red-500" aria-label="Do not contact" />}
                       </div>
                       <p className="truncate text-xs text-fg-subtle">
-                        {lead.country && <span className="mr-1" title={lead.city || lead.country}>{flagEmoji(lead.country)}</span>}
+                        {leadCountry(lead) && (
+                          <span className="mr-1" title={lead.city || countryName(leadCountry(lead))}>
+                            {flagEmoji(leadCountry(lead))}
+                          </span>
+                        )}
                         {[lead.business_type, lead.area || lead.city].filter(Boolean).join(' · ')}
                         {(lead.tags || []).map((tag) => (
                           <span key={tag} className="ml-1 rounded bg-muted px-1 text-[10px]">

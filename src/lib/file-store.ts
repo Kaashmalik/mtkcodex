@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 
-export type FileTableName = 'leads' | 'activities' | 'messages' | 'chats' | 'push' | 'state';
+export type FileTableName = 'leads' | 'activities' | 'messages' | 'chats' | 'push' | 'state' | 'opportunities' | 'campaigns' | 'recipients';
 
 let queue: Promise<unknown> = Promise.resolve();
 

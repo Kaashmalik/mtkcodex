@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { applyWhatsAppStatus, recordInboundWhatsApp } from '@/lib/inbox';
-import { parseWebhook, verifyWebhookSignature, whatsappConfigured, whatsappVerifyToken } from '@/lib/whatsapp';
+import { parseWebhook, verifyTokenMatches, verifyWebhookSignature, whatsappConfigured } from '@/lib/whatsapp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,8 +8,7 @@ export const dynamic = 'force-dynamic';
 /** Meta's one-time subscription handshake. */
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
-  const token = whatsappVerifyToken();
-  if (token && params.get('hub.mode') === 'subscribe' && params.get('hub.verify_token') === token) {
+  if (params.get('hub.mode') === 'subscribe' && verifyTokenMatches(params.get('hub.verify_token'))) {
     return new Response(params.get('hub.challenge') || '', { status: 200, headers: { 'Content-Type': 'text/plain' } });
   }
   return new Response('Forbidden', { status: 403 });

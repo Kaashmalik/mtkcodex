@@ -63,6 +63,8 @@ function htmlBody(text: string): string {
 
 export type OutgoingEmail = {
   to: string;
+  /** Overrides EMAIL_FROM; must be on the same verified domain. */
+  from?: string;
   subject: string;
   text: string;
   replyTo?: string;
@@ -81,7 +83,7 @@ export async function sendEmail(email: OutgoingEmail): Promise<{ id: string }> {
     method: 'POST',
     headers: { Authorization: `Bearer ${env('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: fromAddress(),
+      from: email.from || fromAddress(),
       to: [email.to],
       subject: email.subject.slice(0, 200),
       text: email.text,

@@ -9,6 +9,8 @@ third-party CRM or chat subscription.
 | `/admin/inbox` | One inbox for **website live chat, WhatsApp and email** — read and reply from anywhere |
 | `/admin/deals` | Kanban for work in progress (discovery → proposal → in progress → delivered) |
 | `/admin/outreach` | Click-to-send WhatsApp queue for cold outreach (from your own phone) |
+| `/admin/campaigns` | **Campaigns**: SMS / WhatsApp to consented contacts with tracked links. Guide: [`CAMPAIGNS.md`](./CAMPAIGNS.md) |
+| `/admin/opportunities` | **MTK Hunter**: fresh remote jobs scored against your projects, AI proposals you review and send |
 | `/admin/analytics` | Traffic, live visitor map with city/region/country, outreach numbers |
 | `/admin/settings` | Which channels are connected, phone/desktop alerts, webhook URLs |
 | `/admin/docs` | Short in-app playbook |
@@ -316,6 +318,72 @@ strip on `/admin` lists who is on the site right now.
   cookies or storage. Do Not Track, Global Privacy Control and an "analytics off" choice are honoured.
 - Only real public pages are recorded; bots, `/admin` and `/api` are ignored.
 - Retention: run `select public.analytics_prune(180);` monthly.
+
+---
+
+## 8b. MTK Hunter — remote jobs & AI proposals (`/admin/opportunities`)
+
+Finds fresh remote jobs and client posts, scores them against your real projects, writes a
+tailored proposal, and sends it after your review (or automatically in auto mode, when every
+safety check passes).
+
+> **Full guide:** [`HUNTER.md`](./HUNTER.md) covers setup, choosing models, costs, both modes, every
+> setting and troubleshooting. This section is the short version.
+
+**Flow:** fetch → keyword match → dedupe → AI score → AI draft → **you review** → send email or apply on their page → replies land in the Inbox → follow-ups → deal.
+
+**Setup (10 minutes)**
+1. Run `supabase/migrations/0005_opportunities.sql` in the Supabase SQL editor.
+2. Create a River key at https://console.river.ai/keys and set `LLM_API_KEY` (base URL and models default to River + DeepSeek/Kimi).
+3. Set `CRON_SECRET` (`openssl rand -hex 32`). Netlify runs `netlify/functions/hunter-run.mjs` every hour
+   (at :07). Each run does small steps — fetch (every 6 h), AI score, draft, and in auto mode one send — so
+   nothing hits the function time limit and work is spread through the day.
+4. Email: proposals use Resend like the Inbox. Set `OPP_EMAIL_FROM` to a name on your verified domain
+   (Resend cannot send as `@gmail.com`). Your Gmail goes in the signature via `OPP_CONTACT_EMAIL`, and
+   `EMAIL_FORWARD_TO=kaash0542@gmail.com` copies every reply to Gmail too.
+5. Optional: `OPP_WATCHLIST=greenhouse:vercel,ashby:linear` to check dream companies' own job boards daily.
+
+**Sources (free, no key):** Himalayas (filtered to jobs open to `OPP_COUNTRY`), Remote OK, Remotive,
+Arbeitnow (remote only), Jobicy, We Work Remotely (RSS), Hacker News "Who is hiring" (often with a direct hiring email), and the
+Greenhouse / Lever / Ashby boards in your watchlist. Remote OK and Remotive require a link back and
+credit; the admin always shows the source and links to the listing. Remotive's feed is 24 h delayed.
+
+**Not automated, on purpose:** Upwork, LinkedIn and Fiverr have no public job API and forbid bots.
+Use **Add a job** to paste a post from there: you get a score and a proposal, then submit it on that
+site yourself.
+
+**Automation: two modes** (switch at the top of the Hunter page; **Pause** stops drafting and sending)
+
+| | Review first (default) | Auto send |
+|---|---|---|
+| Drafts | Top matches drafted automatically (`Drafts / day`, from `Draft from score`) | Same |
+| Sending | You review in **Ready to send**, tick several, **Send selected** — or open one and send | Drafts that pass every check go out, max one per hourly run, up to `Auto-sends / day` |
+| Apply-link jobs | Copy & open apply page | Same: forms on other sites are never auto-submitted |
+
+Auto send only sends a draft when **all** of these hold, otherwise it waits in *Ready to send*:
+AI score ≥ `Auto-send from score` (never below 60) · no warnings · open to your country · a hiring
+email **published in the post** (never a guessed address) whose domain accepts mail (MX check) · no
+contact with that company or address in 30 days · not do-not-contact · the draft passes the quality
+check (mentions the company, no `[placeholders]`, no AI boilerplate, sensible length) · under the
+daily caps. Each auto-send triggers a phone alert, and the **Run log** shows every step and error.
+
+**Board health:** the chips under the automation panel show each board's last result (green = OK,
+amber = failed 1–2 times, red = failing). One failing board never stops the run; every board is
+retried once per fetch, and a run only fails if all boards are down.
+
+**Daily routine**
+1. Open **Hunter → Matches** (sorted by match score; "Open to my country" hides location-locked posts).
+2. Open a job → read the fit reason and company signals (open roles, new roles in 14 days).
+3. **Write proposal with AI** → edit → **Send email** (direct email) or **Copy & open apply page**.
+4. **Follow-ups due** shows email proposals with no reply after 4 days (then 6 more, max 2).
+5. Replies arrive in the Inbox; the opportunity flips to *Replied* by itself. Mark *Interview / Won / Lost*.
+
+**Safety & deliverability:** a daily cap (`OPP_DAILY_SEND_LIMIT`, default 20), no sending to
+do-not-contact leads, job posts treated as untrusted text, and links in drafts limited to your own
+site, products, GitHub, LinkedIn and booking page. Prefer posts that invite applications by email.
+
+**Cost:** scoring 500 jobs/day with DeepSeek V4.1 Flash is about $0.10; a Kimi K3.1 Pro proposal is
+about 1–2 cents. Roughly $5–9 a month with the defaults (see `HUNTER.md` → AI models).
 
 ---
 
