@@ -27,5 +27,9 @@ export function useInView<T extends Element>(threshold = 0.25) {
 }
 
 export function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof window === 'undefined') return false;
+  // A visitor can override the OS preference from the navbar (saved in localStorage
+  // and applied to <html data-motion="on"> by the boot script in the root layout).
+  if (document.documentElement.dataset.motion === 'on') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

@@ -84,8 +84,8 @@ export const viewport: Viewport = {
   themeColor: '#031f2b',
 };
 
-// Applies the saved theme (dark by default) before paint to avoid a flash.
-const themeScript = `(function(){document.documentElement.classList.add('js');try{var t=localStorage.getItem('theme');var d=t?t==='dark':true;document.documentElement.classList.toggle('dark',d);var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#031f2b':'#f5f8f7';}catch(e){document.documentElement.classList.add('dark');}})();`;
+// Applies the saved theme (dark by default) and the motion preference before paint to avoid a flash.
+const themeScript = `(function(){document.documentElement.classList.add('js');try{var t=localStorage.getItem('theme');var d=t?t==='dark':true;document.documentElement.classList.toggle('dark',d);var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#031f2b':'#f5f8f7';if(localStorage.getItem('motion')==='on')document.documentElement.dataset.motion='on';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 // Site-wide entity graph: the company, its founder and the website (referenced by @id from other pages).
 const orgJsonLd = {

@@ -13,3 +13,6 @@ next-env.d.ts
 
 # Netlify
 .netlify
+
+# Supabase CLI cache
+supabase/.temp/

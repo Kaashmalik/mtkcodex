@@ -9,6 +9,7 @@ import { services } from '@/data/services';
 import { industries } from '@/data/content';
 import { Logo, Button } from '@/components/ui/primitives';
 import ThemeToggle from './ThemeToggle';
+import MotionToggle from './MotionToggle';
 import ServiceIcon from '@/components/ui/ServiceIcon';
 
 type MenuId = 'products' | 'services' | 'industries' | 'resources' | null;
@@ -191,6 +192,7 @@ export default function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2">
+          <MotionToggle />
           <ThemeToggle />
           <Link href="/login" className="hidden items-center gap-1.5 px-3 text-sm font-semibold text-fg-muted hover:text-fg xl:flex">
             <LogIn className="size-4" /> Log in

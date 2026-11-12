@@ -384,15 +384,17 @@ p {
 .prose-mtk blockquote { border-left: 3px solid var(--accent); padding-left: 1em; font-style: italic; }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  /* Honoured by default, but a visitor can opt back in from the navbar, which sets
+     <html data-motion="on"> before paint (see the boot script in app/layout.tsx). */
+  html:not([data-motion='on']) *,
+  html:not([data-motion='on']) *::before,
+  html:not([data-motion='on']) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .js .reveal {
+  html.js:not([data-motion='on']) .reveal {
     opacity: 1;
     transform: none;
   }
