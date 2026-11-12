@@ -36,8 +36,8 @@ You need the CRM already running (Supabase + Resend, see [`CRM.md`](./CRM.md) �
 |---|---|---|
 | 1 | Run `supabase/migrations/0005_opportunities.sql` | Supabase → SQL editor |
 | 2 | Create an API key | https://console.river.ai/keys (keys start with `rv_`) |
-| 3 | Add the env vars below | Netlify → Project configuration → Environment variables |
-| 4 | Redeploy | Netlify → Deploys → Trigger deploy |
+| 3 | Add the env vars below | Vercel → Project → Settings → Environment Variables (Production) |
+| 4 | Redeploy | `vercel --prod --scope kaash0542-6365s-projects`, or redeploy the current deployment |
 | 5 | Open **Hunter → Run now** and watch the run log | `/admin/opportunities` |
 | 6 | Check **Settings** shows *MTK Hunter — AI* and *hourly run* as on | `/admin/settings` |
 
@@ -323,8 +323,10 @@ direction* ("mention I can start Monday", "focus on the scraping side").
 
 ## 9. The hourly run
 
-Netlify runs `netlify/functions/hunter-run.mjs` every hour at :07. Each run calls
-`/api/cron/hunter` one step at a time, so every request stays inside the hosting time limit:
+The `hunter` schedule in `vercel.json` calls `GET /api/cron/hunter-run` every hour at :07 (on
+Netlify: the `netlify/functions/hunter-run.mjs` scheduled function). One invocation runs the steps
+in-process until the queue empties or it reaches its 45-second budget; each step saves its progress,
+so a run cut short resumes next hour:
 
 1. **Fetch** all boards, if the last fetch was over 6 hours ago
 2. **Score** up to 3 batches with the AI
@@ -426,8 +428,9 @@ auto-send-from score (see [section 4](#4-review-mode-vs-auto-mode)).
 | `src/lib/hunter-runner.ts` | One step at a time: fetch, score, draft, send; batch send |
 | `src/lib/llm.ts` | OpenAI-compatible client (River by default) |
 | `src/lib/app-state.ts` | Small key/value store (`app_state`) |
-| `src/app/api/cron/hunter/route.ts` | Hourly step endpoint (Bearer `CRON_SECRET`) |
-| `netlify/functions/hunter-run.mjs` | Netlify scheduled function |
+| `src/app/api/cron/hunter/route.ts` | Single-step endpoint (Bearer `CRON_SECRET`) |
+| `src/app/api/cron/hunter-run/route.ts` | Hourly batch used by the Vercel Schedule |
+| `netlify/functions/hunter-run.mjs` | Netlify scheduled function (alternative host) |
 | `supabase/migrations/0005_opportunities.sql` | `opportunities` table |
 
 **Admin API** (session cookie; POST/PUT/PATCH also check the Origin header)

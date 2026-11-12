@@ -49,7 +49,7 @@ and no setting makes them legal to text.
 | Step | What to do |
 |---|---|
 | 1 | Run `supabase/migrations/0006_campaigns.sql` in the Supabase SQL editor (after 0001–0005) |
-| 2 | Set `CRON_SECRET` if you haven't (shared with MTK Hunter). Netlify runs `netlify/functions/campaigns-run.mjs` every 15 minutes |
+| 2 | Set `CRON_SECRET` if you haven't (shared with MTK Hunter). The `campaigns` schedule in `vercel.json` calls `GET /api/cron/campaigns` every 15 minutes (on Netlify: `netlify/functions/campaigns-run.mjs`) |
 | 3 | **For SMS:** set up Twilio (below) |
 | 4 | **For WhatsApp:** connect the WhatsApp Cloud API ([`CRM.md`](./CRM.md) → Step 6) and get a marketing template approved |
 | 5 | Redeploy, then check **Settings** shows *SMS campaigns (Twilio)* as on |
@@ -273,7 +273,7 @@ carriers block that traffic, it breaks their terms, and numbers get banned fast.
 | *Failed* 21610 | That person replied STOP earlier | Nothing to do: they're marked do-not-contact |
 | *Failed* 21614 / 30006 | Landline or unreachable number | Nothing to do |
 | Queued but nothing sends | Outside local hours, daily limit reached, or campaign paused | Wait for the window, or check the campaign card |
-| Nothing sends for hours | 15-minute job not running | Check `CRON_SECRET`, and Netlify → Functions → `campaigns-run` logs |
+| Nothing sends for hours | 15-minute job not running | Check `CRON_SECRET`, then the Vercel **campaigns** schedule (Project → Schedules) or Netlify → Functions → `campaigns-run` logs |
 | WhatsApp sends fail | Template not approved, wrong name or language, or wrong number of variables | Match the template exactly as approved in WhatsApp Manager |
 | SMS replies not recorded | Webhook not set | Set the Messaging Service incoming webhook to `/api/sms/webhook` |
 
@@ -308,7 +308,8 @@ carriers block that traffic, it breaks their terms, and numbers get banned fast.
 | `src/app/go/[token]/route.ts` | Tracked link redirect |
 | `src/app/api/sms/webhook/route.ts` | Twilio inbound + status webhook |
 | `src/app/api/cron/campaigns/route.ts` | 15-minute sender (Bearer `CRON_SECRET`) |
-| `netlify/functions/campaigns-run.mjs` | Netlify scheduled function |
+| `vercel.json` | Vercel Schedules: `campaigns` every 15 min, `hunter` hourly |
+| `netlify/functions/campaigns-run.mjs` | Netlify scheduled function (alternative host) |
 | `supabase/migrations/0006_campaigns.sql` | Consent columns on `leads`, `campaigns`, `campaign_recipients` |
 
 **Admin API:** `GET/POST/PATCH /api/admin/campaigns` (list with stats, create, edit or

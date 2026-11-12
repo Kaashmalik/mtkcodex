@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "schedules": {
+    "campaigns": {
+      "schedule": "*/15 * * * *",
+      "path": "/api/cron/campaigns",
+      "requestMethod": "GET"
+    },
+    "hunter": {
+      "schedule": "7 * * * *",
+      "path": "/api/cron/hunter-run",
+      "requestMethod": "GET"
+    }
+  }
+}

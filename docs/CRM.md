@@ -3,6 +3,13 @@
 The marketing site doubles as the MTK Codex CRM. Everything lives in this Next.js app — no
 third-party CRM or chat subscription.
 
+> **Live hosting today:** production runs on **Vercel** at `www.mtkcodex.tech` (project
+> `kaash0542-6365s-projects/mtkcodex`), with env vars in Vercel → Production. Recurring jobs are
+> declared in [`vercel.json`](../vercel.json) and run through **Vercel Schedules**: `campaigns`
+> every 15 minutes and `hunter` hourly. Both are path schedules, so Vercel sends
+> `Authorization: Bearer $CRON_SECRET` automatically. The Netlify instructions in Step 0 are the
+> alternative if you move hosts.
+
 | Page | What it does |
 |---|---|
 | `/admin` | Leads: pipeline table, filters, bulk actions, import/export, today's to-dos, live visitors |
@@ -27,6 +34,11 @@ on by itself once its env vars are set. All values go in your host's environment
 testing put the same values in `.env.local` (gitignored).
 
 ### Step 0 — Hosting on Netlify (free, commercial use allowed)
+
+> **Current deployment is Vercel, not Netlify.** The notes in this step are kept for a future
+> move; to ship a change today use `vercel --prod --scope kaash0542-6365s-projects` (or redeploy
+> the current deployment) and add env vars under Vercel → Project → Settings → Environment
+> Variables for **Production**.
 
 Vercel's free Hobby plan is for non-commercial sites only, so the site runs on **Netlify's free
 plan**, which allows business sites. The code is host-neutral: visitor locations and client IPs
@@ -335,8 +347,9 @@ safety check passes).
 **Setup (10 minutes)**
 1. Run `supabase/migrations/0005_opportunities.sql` in the Supabase SQL editor.
 2. Create a River key at https://console.river.ai/keys and set `LLM_API_KEY` (base URL and models default to River + DeepSeek/Kimi).
-3. Set `CRON_SECRET` (`openssl rand -hex 32`). Netlify runs `netlify/functions/hunter-run.mjs` every hour
-   (at :07). Each run does small steps — fetch (every 6 h), AI score, draft, and in auto mode one send — so
+3. Set `CRON_SECRET` (`openssl rand -hex 32`). The `hunter` schedule in `vercel.json` calls
+   `GET /api/cron/hunter-run` every hour at :07 (on Netlify: `netlify/functions/hunter-run.mjs`).
+   Each run does small steps in-process — fetch (every 6 h), AI score, draft, and in auto mode one send — so
    nothing hits the function time limit and work is spread through the day.
 4. Email: proposals use Resend like the Inbox. Set `OPP_EMAIL_FROM` to a name on your verified domain
    (Resend cannot send as `@gmail.com`). Your Gmail goes in the signature via `OPP_CONTACT_EMAIL`, and
